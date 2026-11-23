@@ -22,14 +22,12 @@ import {
   Calendar,
   AlertCircle,
   Target,
+  Pencil,
   X,
 } from "lucide-react";
 
 const OWNER_PASSWORD = "Negocio2026";
 
-// Stock inicial del menú:
-// - Minutas: comparten el stock de bandejas (400)
-// - Licuados: comparten el stock general de vasos de licuados (600)
 const INITIAL_MENU = [
   {
     id: 1,
@@ -102,7 +100,6 @@ const INITIAL_MENU = [
   },
 ];
 
-// Cantidades limpias (sin peso en nombres) para camarones, sal, chile, alguashte, hielo y demás insumos
 const INITIAL_SUPPLIES = [
   { id: "s1", name: "vasos de licuados", type: "Empaques", stock: 600 },
   { id: "s2", name: "vasos de minutas", type: "Empaques", stock: 300 },
@@ -246,9 +243,6 @@ const INITIAL_FINANCIAL = {
   reinvestments: [],
 };
 
-// Sincroniza el stock visible de cada producto con el empaque compartido correspondiente:
-// - Minutas -> bandejas disponibles (s3)
-// - Licuados -> vasos de licuados disponibles (s1)
 function syncProductsWithSharedSupplies(prodList, supList) {
   const traySup = supList.find((s) => s.id === "s3");
   const licuadoCupSup = supList.find((s) => s.id === "s1");
@@ -261,6 +255,22 @@ function syncProductsWithSharedSupplies(prodList, supList) {
       return { ...p, stock: licuadoCupSup.stock };
     }
     return p;
+  });
+}
+
+function applySupplyNetChanges(supList, netMinutasDelta, netLicuadosDelta) {
+  const netTotalDrinks = netMinutasDelta + netLicuadosDelta;
+  return supList.map((sup) => {
+    let delta = 0;
+    if (sup.id === "s3") delta += netMinutasDelta;
+    if (sup.id === "s2") delta += netMinutasDelta;
+    if (sup.id === "s1") delta += netLicuadosDelta;
+    if (sup.id === "s8") delta += netTotalDrinks;
+
+    if (delta !== 0) {
+      return { ...sup, stock: Math.max(0, sup.stock - delta) };
+    }
+    return sup;
   });
 }
 
@@ -279,14 +289,24 @@ export default function NegocioElCheleApp() {
   const [cart, setCart] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState("Efectivo");
   const [cashGiven, setCashGiven] = useState("");
+  const [transactionCode, setTransactionCode] = useState("");
   const [saleSuccess, setSaleSuccess] = useState(false);
 
-  // Contraseña única para desbloquear Precio y Stock inicial del menú, o sección Financiero
+  // Contraseñas: Precio/Stock, Financiero y Modificar/Eliminar Ventas
   const [priceAndStockUnlocked, setPriceAndStockUnlocked] = useState(false);
   const [financialUnlocked, setFinancialUnlocked] = useState(false);
+  const [salesEditUnlocked, setSalesEditUnlocked] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [pendingAction, setPendingAction] = useState(null); // 'priceAndStock' | 'financial'
+  const [pendingAction, setPendingAction] = useState(null); // 'priceAndStock' | 'financial' | 'editSale' | 'deleteSale'
+  const [salePendingAction, setSalePendingAction] = useState(null);
+
+  // Modal para modificar una venta existente
+  const [editingSale, setEditingSale] = useState(null);
+  const [editSaleItems, setEditSaleItems] = useState([]);
+  const [editSaleMethod, setEditSaleMethod] = useState("Efectivo");
+  const [editSaleCashGiven, setEditSaleCashGiven] = useState("");
+  const [editSaleTxCode, setEditSaleTxCode] = useState("");
 
   // Modal "Actualizar inventario"
   const [updateInvModalOpen, setUpdateInvModalOpen] = useState(false);
@@ -319,11 +339,11 @@ export default function NegocioElCheleApp() {
   const [extraPayAmount, setExtraPayAmount] = useState("");
 
   useEffect(() => {
-    const savedProducts = localStorage.getItem("chele_v6_products");
-    const savedSupplies = localStorage.getItem("chele_v6_supplies");
-    const savedInvLogs = localStorage.getItem("chele_v6_inv_logs");
-    const savedSales = localStorage.getItem("chele_v6_sales");
-    const savedFinancial = localStorage.getItem("chele_v6_financial");
+    const savedProducts = localStorage.getItem("chele_v7_products");
+    const savedSupplies = localStorage.getItem("chele_v7_supplies");
+    const savedInvLogs = localStorage.getItem("chele_v7_inv_logs");
+    const savedSales = localStorage.getItem("chele_v7_sales");
+    const savedFinancial = localStorage.getItem("chele_v7_financial");
 
     const loadedSupplies = savedSupplies
       ? JSON.parse(savedSupplies)
@@ -343,33 +363,86 @@ export default function NegocioElCheleApp() {
 
   useEffect(() => {
     if (products.length > 0) {
-      localStorage.setItem("chele_v6_products", JSON.stringify(products));
+      localStorage.setItem("chele_v7_products", JSON.stringify(products));
     }
   }, [products]);
 
   useEffect(() => {
     if (supplies.length > 0) {
-      localStorage.setItem("chele_v6_supplies", JSON.stringify(supplies));
+      localStorage.setItem("chele_v7_supplies", JSON.stringify(supplies));
     }
   }, [supplies]);
 
   useEffect(() => {
-    localStorage.setItem("chele_v6_inv_logs", JSON.stringify(inventoryLogs));
+    localStorage.setItem("chele_v7_inv_logs", JSON.stringify(inventoryLogs));
   }, [inventoryLogs]);
 
   useEffect(() => {
-    localStorage.setItem("chele_v6_sales", JSON.stringify(sales));
+    localStorage.setItem("chele_v7_sales", JSON.stringify(sales));
   }, [sales]);
 
   useEffect(() => {
-    localStorage.setItem("chele_v6_financial", JSON.stringify(financial));
+    localStorage.setItem("chele_v7_financial", JSON.stringify(financial));
   }, [financial]);
 
   // --- CONTRASEÑA ---
-  const openPasswordModal = (target) => {
+  const openPasswordModal = (target, saleObj = null) => {
     setPasswordInput("");
     setPasswordError("");
     setPendingAction(target);
+    setSalePendingAction(saleObj);
+  };
+
+  const openSaleEditorDirectly = (saleObj) => {
+    setEditingSale(saleObj);
+    setEditSaleItems(saleObj.items.map((it) => ({ ...it })));
+    setEditSaleMethod(saleObj.paymentMethod);
+    setEditSaleCashGiven(
+      saleObj.paymentMethod === "Efectivo" ? String(saleObj.cashGiven ?? "") : ""
+    );
+    setEditSaleTxCode(saleObj.transactionCode || "");
+  };
+
+  const deleteSaleAndRestoreStock = (saleObj) => {
+    const confirmed = window.confirm(
+      `¿Eliminar la venta del ${saleObj.date} por $${Number(
+        saleObj.total
+      ).toFixed(2)} y devolver su stock?`
+    );
+    if (!confirmed) return;
+
+    const minutasSold = saleObj.items
+      .filter((i) => i.category === "Minutas")
+      .reduce((s, i) => s + (parseInt(i.qty, 10) || 0), 0);
+
+    const licuadosSold = saleObj.items
+      .filter((i) => i.category === "Licuados")
+      .reduce((s, i) => s + (parseInt(i.qty, 10) || 0), 0);
+
+    // Restar delta negativo equivale a sumar (devolver) el stock descontado
+    const updatedSupplies = applySupplyNetChanges(
+      supplies,
+      -minutasSold,
+      -licuadosSold
+    );
+    setSupplies(updatedSupplies);
+
+    const updatedProducts = syncProductsWithSharedSupplies(
+      products.map((prod) => {
+        if (prod.category === "Minutas" || prod.category === "Licuados") {
+          return prod;
+        }
+        const soldItem = saleObj.items.find((i) => i.id === prod.id);
+        const qtyToRestore = parseInt(soldItem?.qty, 10) || 0;
+        return qtyToRestore > 0
+          ? { ...prod, stock: prod.stock + qtyToRestore }
+          : prod;
+      }),
+      updatedSupplies
+    );
+    setProducts(updatedProducts);
+
+    setSales(sales.filter((s) => s.id !== saleObj.id));
   };
 
   const handlePasswordSubmit = (e) => {
@@ -380,13 +453,153 @@ export default function NegocioElCheleApp() {
       } else if (pendingAction === "financial") {
         setFinancialUnlocked(true);
         setActiveTab("financial");
+      } else if (pendingAction === "editSale") {
+        setSalesEditUnlocked(true);
+        if (salePendingAction) {
+          openSaleEditorDirectly(salePendingAction);
+        }
+      } else if (pendingAction === "deleteSale") {
+        setSalesEditUnlocked(true);
+        const targetSale = salePendingAction;
+        setPendingAction(null);
+        setSalePendingAction(null);
+        setPasswordInput("");
+        setPasswordError("");
+        if (targetSale) {
+          deleteSaleAndRestoreStock(targetSale);
+        }
+        return;
       }
       setPendingAction(null);
+      setSalePendingAction(null);
       setPasswordInput("");
       setPasswordError("");
     } else {
       setPasswordError("Contraseña incorrecta. Ingresa Negocio2026.");
     }
+  };
+
+  // --- MODIFICAR / ELIMINAR VENTA EXISTENTE ---
+  const handleRequestEditSale = (saleObj) => {
+    if (!salesEditUnlocked) {
+      openPasswordModal("editSale", saleObj);
+      return;
+    }
+    openSaleEditorDirectly(saleObj);
+  };
+
+  const handleRequestDeleteSale = (saleObj) => {
+    if (!salesEditUnlocked) {
+      openPasswordModal("deleteSale", saleObj);
+      return;
+    }
+    deleteSaleAndRestoreStock(saleObj);
+  };
+
+  const handleUpdateEditItemQty = (itemId, newQtyRaw) => {
+    const qty = Math.max(0, parseInt(newQtyRaw, 10) || 0);
+    setEditSaleItems(
+      editSaleItems.map((it) => (it.id === itemId ? { ...it, qty } : it))
+    );
+  };
+
+  const editedSaleTotal = editSaleItems.reduce(
+    (sum, it) => sum + (parseFloat(it.price) || 0) * (parseInt(it.qty, 10) || 0),
+    0
+  );
+  const editedCashNum = parseFloat(editSaleCashGiven);
+  const editedChangeAmount =
+    editSaleMethod === "Efectivo" && !Number.isNaN(editedCashNum)
+      ? editedCashNum - editedSaleTotal
+      : 0;
+
+  const handleSaveEditedSale = (e) => {
+    e.preventDefault();
+    if (!editingSale) return;
+
+    const cleanedItems = editSaleItems
+      .map((it) => ({ ...it, qty: Math.max(0, parseInt(it.qty, 10) || 0) }))
+      .filter((it) => it.qty > 0);
+
+    if (cleanedItems.length === 0) {
+      alert("La venta debe tener al menos 1 producto con cantidad mayor a 0.");
+      return;
+    }
+
+    if (
+      editSaleMethod === "Efectivo" &&
+      (Number.isNaN(editedCashNum) || editedCashNum < editedSaleTotal)
+    ) {
+      alert("El efectivo recibido debe ser igual o mayor al nuevo total.");
+      return;
+    }
+
+    const oldMinutas = editingSale.items
+      .filter((i) => i.category === "Minutas")
+      .reduce((s, i) => s + i.qty, 0);
+    const newMinutas = cleanedItems
+      .filter((i) => i.category === "Minutas")
+      .reduce((s, i) => s + i.qty, 0);
+
+    const oldLicuados = editingSale.items
+      .filter((i) => i.category === "Licuados")
+      .reduce((s, i) => s + i.qty, 0);
+    const newLicuados = cleanedItems
+      .filter((i) => i.category === "Licuados")
+      .reduce((s, i) => s + i.qty, 0);
+
+    const updatedSupplies = applySupplyNetChanges(
+      supplies,
+      newMinutas - oldMinutas,
+      newLicuados - oldLicuados
+    );
+    setSupplies(updatedSupplies);
+
+    const updatedProducts = syncProductsWithSharedSupplies(
+      products.map((prod) => {
+        if (prod.category === "Minutas" || prod.category === "Licuados") {
+          return prod;
+        }
+        const prevItem = editingSale.items.find((i) => i.id === prod.id);
+        const nextItem = cleanedItems.find((i) => i.id === prod.id);
+        const diff = (nextItem?.qty || 0) - (prevItem?.qty || 0);
+        return diff !== 0
+          ? { ...prod, stock: Math.max(0, prod.stock - diff) }
+          : prod;
+      }),
+      updatedSupplies
+    );
+    setProducts(updatedProducts);
+
+    const cleanTxCode =
+      editSaleMethod === "Transferencia" || editSaleMethod === "Tarjeta"
+        ? editSaleTxCode.trim()
+        : "";
+
+    const updatedSalesList = sales.map((s) =>
+      s.id === editingSale.id
+        ? {
+            ...s,
+            items: cleanedItems,
+            total: editedSaleTotal,
+            paymentMethod: editSaleMethod,
+            transactionCode: cleanTxCode,
+            cashGiven:
+              editSaleMethod === "Efectivo" ? editedCashNum : editedSaleTotal,
+            change:
+              editSaleMethod === "Efectivo"
+                ? Math.max(0, editedChangeAmount)
+                : 0,
+            editedAt: new Date().toLocaleString("es-SV"),
+          }
+        : s
+    );
+
+    setSales(updatedSalesList);
+    setEditingSale(null);
+    setEditSaleItems([]);
+    setEditSaleCashGiven("");
+    setEditSaleTxCode("");
   };
 
   // --- ACTUALIZAR INVENTARIO DE INSUMOS CON HISTORIAL ---
@@ -469,19 +682,12 @@ export default function NegocioElCheleApp() {
   const addToCart = (product) => {
     if (product.stock <= 0) return;
 
-    // Para productos que comparten stock (Minutas -> bandejas, Licuados -> vasos de licuados),
-    // sumamos todas las unidades de esa misma categoría en el carrito para no exceder el stock compartido.
     const sameCategoryCartQty = cart
       .filter((item) => item.category === product.category)
       .reduce((sum, item) => sum + item.qty, 0);
 
     const existing = cart.find((item) => item.id === product.id);
-    const maxAllowed =
-      product.category === "Minutas" || product.category === "Licuados"
-        ? product.stock
-        : product.stock;
-
-    if (sameCategoryCartQty >= maxAllowed) return;
+    if (sameCategoryCartQty >= product.stock) return;
 
     if (existing) {
       setCart(
@@ -532,9 +738,6 @@ export default function NegocioElCheleApp() {
       ? cashNum - cartTotal
       : 0;
 
-  // Al completar venta:
-  // - Minutas descuentan de bandejas (s3), vasos de minutas (s2) y pajillas (s8/s7)
-  // - Licuados descuentan de vasos de licuados (s1) y pajillas (s8/s7)
   const handleCompleteSale = () => {
     if (cart.length === 0) return;
     if (
@@ -553,32 +756,11 @@ export default function NegocioElCheleApp() {
       .filter((c) => c.category === "Licuados")
       .reduce((sum, c) => sum + c.qty, 0);
 
-    const updatedSupplies = supplies.map((sup) => {
-      let deduction = 0;
-
-      if (sup.id === "s3" && minutasSold > 0) {
-        // Bandejas compartidas por todas las minutas
-        deduction += minutasSold;
-      }
-      if (sup.id === "s2" && minutasSold > 0) {
-        // Vasos de minutas compartidos
-        deduction += minutasSold;
-      }
-      if (sup.id === "s1" && licuadosSold > 0) {
-        // Vasos de licuados compartidos (guineo, fresa, oreo, etc.)
-        deduction += licuadosSold;
-      }
-      // Pajillas con emboltorio (s8) para minutas y licuados
-      if (sup.id === "s8" && minutasSold + licuadosSold > 0) {
-        deduction += minutasSold + licuadosSold;
-      }
-
-      if (deduction > 0) {
-        return { ...sup, stock: Math.max(0, sup.stock - deduction) };
-      }
-      return sup;
-    });
-
+    const updatedSupplies = applySupplyNetChanges(
+      supplies,
+      minutasSold,
+      licuadosSold
+    );
     setSupplies(updatedSupplies);
 
     const updatedProducts = syncProductsWithSharedSupplies(
@@ -594,8 +776,12 @@ export default function NegocioElCheleApp() {
       }),
       updatedSupplies
     );
-
     setProducts(updatedProducts);
+
+    const cleanTxCode =
+      paymentMethod === "Transferencia" || paymentMethod === "Tarjeta"
+        ? transactionCode.trim()
+        : "";
 
     const newSale = {
       id: Date.now(),
@@ -603,6 +789,7 @@ export default function NegocioElCheleApp() {
       items: cart,
       total: cartTotal,
       paymentMethod,
+      transactionCode: cleanTxCode,
       cashGiven: paymentMethod === "Efectivo" ? cashNum : cartTotal,
       change: paymentMethod === "Efectivo" ? Math.max(0, changeAmount) : 0,
     };
@@ -610,11 +797,12 @@ export default function NegocioElCheleApp() {
     setSales([newSale, ...sales]);
     setCart([]);
     setCashGiven("");
+    setTransactionCode("");
     setSaleSuccess(true);
     setTimeout(() => setSaleSuccess(false), 3000);
   };
 
-  // --- PRECIO Y STOCK INICIAL PROTEGIDOS POR EL MISMO BOTÓN ---
+  // --- PRECIO Y STOCK INICIAL PROTEGIDOS ---
   const handleProtectedPriceChange = (productId, rawValue) => {
     if (!priceAndStockUnlocked) {
       openPasswordModal("priceAndStock");
@@ -698,7 +886,7 @@ export default function NegocioElCheleApp() {
     setNewProdStock("");
   };
 
-  // --- FINANCIERO: EMPLEADOS, DEUDAS Y REINVERSIONES ---
+  // --- FINANCIERO ---
   const toggleEmployeePayment = (empId, payId) => {
     setFinancial({
       ...financial,
@@ -862,6 +1050,7 @@ export default function NegocioElCheleApp() {
           Productos: s.items.map((i) => `${i.qty}x ${i.name}`).join(", "),
           Total: Number(s.total.toFixed(2)),
           Metodo_Pago: s.paymentMethod,
+          Codigo_Transaccion: s.transactionCode || "",
           Cambio: Number(s.change.toFixed(2)),
         }))
       ),
@@ -952,12 +1141,20 @@ export default function NegocioElCheleApp() {
               <span>
                 {pendingAction === "financial"
                   ? "Acceso a Financiero"
+                  : pendingAction === "deleteSale"
+                  ? "Desbloquear Eliminación de Ventas"
+                  : pendingAction === "editSale"
+                  ? "Desbloquear Edición de Ventas"
                   : "Desbloquear Precio y Stock Inicial"}
               </span>
             </div>
             <p className="text-sm text-slate-600">
               {pendingAction === "financial"
                 ? "Ingresa la contraseña del dueño para acceder al panel financiero."
+                : pendingAction === "deleteSale"
+                ? "Ingresa la contraseña del dueño para eliminar ventas y devolver su stock."
+                : pendingAction === "editSale"
+                ? "Ingresa la contraseña del dueño para modificar ventas registradas."
                 : "Ingresa la contraseña del dueño para modificar precios o colocar el stock inicial del menú."}
             </p>
             <input
@@ -976,7 +1173,10 @@ export default function NegocioElCheleApp() {
             <div className="flex justify-end gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => setPendingAction(null)}
+                onClick={() => {
+                  setPendingAction(null);
+                  setSalePendingAction(null);
+                }}
                 className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-medium hover:bg-slate-50"
               >
                 Cancelar
@@ -986,6 +1186,147 @@ export default function NegocioElCheleApp() {
                 className="px-4 py-2 rounded-xl bg-blue-800 text-white text-sm font-semibold hover:bg-blue-900"
               >
                 Entrar
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL PARA MODIFICAR UNA VENTA */}
+      {editingSale && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSaveEditedSale}
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Modificar Venta
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Registrada el {editingSale.date}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingSale(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-2.5">
+              <label className="block text-xs font-bold uppercase text-slate-500">
+                Cantidades por producto (0 elimina el producto de la venta)
+              </label>
+              {editSaleItems.map((it) => (
+                <div
+                  key={it.id}
+                  className="flex justify-between items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200"
+                >
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm text-slate-800">
+                      {it.name}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      ${Number(it.price).toFixed(2)} c/u · {it.category}
+                    </p>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    value={it.qty}
+                    onChange={(e) =>
+                      handleUpdateEditItemQty(it.id, e.target.value)
+                    }
+                    className="w-20 p-1.5 border border-slate-300 rounded-lg bg-white text-right font-bold"
+                  />
+                  <div className="w-20 text-right font-bold text-sm text-slate-900">
+                    ${(Number(it.price) * (parseInt(it.qty, 10) || 0)).toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                  Método de Pago
+                </label>
+                <select
+                  value={editSaleMethod}
+                  onChange={(e) => setEditSaleMethod(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm font-semibold"
+                >
+                  <option value="Efectivo">Efectivo</option>
+                  <option value="Transferencia">Transferencia</option>
+                  <option value="Tarjeta">Tarjeta</option>
+                </select>
+              </div>
+
+              {editSaleMethod === "Efectivo" && (
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                    Efectivo recibido ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editSaleCashGiven}
+                    onChange={(e) => setEditSaleCashGiven(e.target.value)}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm font-bold text-right"
+                  />
+                </div>
+              )}
+
+              {(editSaleMethod === "Transferencia" ||
+                editSaleMethod === "Tarjeta") && (
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                    Código de transacción
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. TXN-948271"
+                    value={editSaleTxCode}
+                    onChange={(e) => setEditSaleTxCode(e.target.value)}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm font-semibold"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex justify-between items-center">
+              <span className="font-bold text-slate-700">Nuevo Total:</span>
+              <span className="text-xl font-extrabold text-blue-800">
+                ${editedSaleTotal.toFixed(2)}
+              </span>
+            </div>
+
+            {editSaleMethod === "Efectivo" && (
+              <div className="flex justify-between items-center text-sm px-1">
+                <span className="text-slate-600 font-medium">Cambio:</span>
+                <span className="font-extrabold text-green-700">
+                  ${editedChangeAmount > 0 ? editedChangeAmount.toFixed(2) : "0.00"}
+                </span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingSale(null)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-medium hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-blue-800 hover:bg-blue-900 text-white text-sm font-bold"
+              >
+                Guardar Cambios
               </button>
             </div>
           </form>
@@ -1405,6 +1746,22 @@ export default function NegocioElCheleApp() {
                   </div>
                 )}
 
+                {(paymentMethod === "Transferencia" ||
+                  paymentMethod === "Tarjeta") && (
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5">
+                    <label className="block text-xs font-bold uppercase text-slate-600">
+                      Código de transacción ({paymentMethod})
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ingresa el código o referencia"
+                      value={transactionCode}
+                      onChange={(e) => setTransactionCode(e.target.value)}
+                      className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm font-semibold"
+                    />
+                  </div>
+                )}
+
                 <button
                   onClick={handleCompleteSale}
                   disabled={cart.length === 0}
@@ -1744,7 +2101,7 @@ export default function NegocioElCheleApp() {
           </div>
         )}
 
-        {/* 3. HISTORIAL DE VENTAS */}
+        {/* 3. HISTORIAL DE VENTAS CON MODIFICACIÓN Y ELIMINACIÓN PROTEGIDAS */}
         {activeTab === "history" && (
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
@@ -1754,12 +2111,37 @@ export default function NegocioElCheleApp() {
                   Total Vendido: ${totalSold.toFixed(2)}
                 </p>
               </div>
-              <button
-                onClick={exportToExcel}
-                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold"
-              >
-                <Download size={17} /> Exportar Reporte Excel
-              </button>
+              <div className="flex flex-wrap gap-2.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    salesEditUnlocked
+                      ? setSalesEditUnlocked(false)
+                      : openPasswordModal("editSale")
+                  }
+                  className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold border transition ${
+                    salesEditUnlocked
+                      ? "bg-amber-100 border-amber-400 text-amber-900"
+                      : "bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  {salesEditUnlocked ? (
+                    <Unlock size={16} />
+                  ) : (
+                    <Lock size={16} />
+                  )}
+                  {salesEditUnlocked
+                    ? "Edición Desbloqueada"
+                    : "Desbloquear Edición"}
+                </button>
+
+                <button
+                  onClick={exportToExcel}
+                  className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold"
+                >
+                  <Download size={17} /> Exportar Reporte Excel
+                </button>
+              </div>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
@@ -1776,6 +2158,7 @@ export default function NegocioElCheleApp() {
                       <th className="p-4">Pago</th>
                       <th className="p-4">Total</th>
                       <th className="p-4">Cambio</th>
+                      <th className="p-4 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -1783,6 +2166,11 @@ export default function NegocioElCheleApp() {
                       <tr key={sale.id} className="hover:bg-slate-50">
                         <td className="p-4 text-slate-500 whitespace-nowrap">
                           {sale.date}
+                          {sale.editedAt && (
+                            <span className="block text-[11px] text-amber-700">
+                              Editada: {sale.editedAt}
+                            </span>
+                          )}
                         </td>
                         <td className="p-4 font-medium">
                           {sale.items
@@ -1793,6 +2181,13 @@ export default function NegocioElCheleApp() {
                           <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                             {sale.paymentMethod}
                           </span>
+                          {(sale.paymentMethod === "Transferencia" ||
+                            sale.paymentMethod === "Tarjeta") &&
+                            sale.transactionCode && (
+                              <span className="block text-[11px] text-slate-600 font-semibold mt-1">
+                                Cód: {sale.transactionCode}
+                              </span>
+                            )}
                         </td>
                         <td className="p-4 font-extrabold text-slate-900">
                           ${sale.total.toFixed(2)}
@@ -1801,6 +2196,26 @@ export default function NegocioElCheleApp() {
                           {sale.paymentMethod === "Efectivo"
                             ? `$${sale.change.toFixed(2)}`
                             : "-"}
+                        </td>
+                        <td className="p-4 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleRequestEditSale(sale)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                            >
+                              {!salesEditUnlocked && <Lock size={13} />}
+                              <Pencil size={13} /> Modificar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRequestDeleteSale(sale)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-xs font-bold text-red-700 hover:bg-red-100"
+                            >
+                              {!salesEditUnlocked && <Lock size={13} />}
+                              <Trash2 size={13} /> Eliminar
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
