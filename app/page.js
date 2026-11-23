@@ -29,6 +29,8 @@ import {
 
 const OWNER_PASSWORD = "Negocio2026";
 
+const BASE_CATEGORIES = ["Minutas", "Licuados"];
+
 const INITIAL_MENU = [
   {
     id: 1,
@@ -492,6 +494,16 @@ export default function NegocioElCheleApp() {
     localStorage.setItem("chele_v7_financial", JSON.stringify(financial));
   }, [financial]);
 
+  // --- CATEGORÍAS DISPONIBLES (BASE + ESCRITAS POR EL USUARIO) ---
+  const availableCategories = Array.from(
+    new Set([
+      ...BASE_CATEGORIES,
+      ...products
+        .map((p) => (p.category || "").trim())
+        .filter((cat) => cat.length > 0),
+    ])
+  );
+
   // --- CONTRASEÑA ---
   const openPasswordModal = (target, payloadObj = null) => {
     setPasswordInput("");
@@ -720,13 +732,14 @@ export default function NegocioElCheleApp() {
 
     const parsedPrice = parseFloat(editProdPrice);
     const parsedStock = parseInt(editProdStock, 10);
+    const finalCategory = editProdCategory.trim() || "General";
 
     const updatedList = products.map((p) => {
       if (p.id !== editingProduct.id) return p;
       return {
         ...p,
         name: editProdName.trim(),
-        category: editProdCategory,
+        category: finalCategory,
         price: Number.isNaN(parsedPrice) ? p.price : parsedPrice,
         stock: Number.isNaN(parsedStock) ? p.stock : Math.max(0, parsedStock),
         description: editProdDesc.trim(),
@@ -948,6 +961,10 @@ export default function NegocioElCheleApp() {
     if (product.stock <= 0) return;
 
     const hasRecipe = Array.isArray(product.recipe) && product.recipe.length > 0;
+    const isSharedBaseCategory =
+      !hasRecipe &&
+      (product.category === "Minutas" || product.category === "Licuados");
+
     const sameCategoryCartQty = cart
       .filter((item) => item.category === product.category)
       .reduce((sum, item) => sum + item.qty, 0);
@@ -955,8 +972,8 @@ export default function NegocioElCheleApp() {
     const existing = cart.find((item) => item.id === product.id);
     const currentItemQty = existing ? existing.qty : 0;
 
-    if (hasRecipe && currentItemQty >= product.stock) return;
-    if (!hasRecipe && sameCategoryCartQty >= product.stock) return;
+    if (!isSharedBaseCategory && currentItemQty >= product.stock) return;
+    if (isSharedBaseCategory && sameCategoryCartQty >= product.stock) return;
 
     if (existing) {
       setCart(
@@ -972,6 +989,11 @@ export default function NegocioElCheleApp() {
   const updateCartQty = (id, delta) => {
     const prod = products.find((p) => p.id === id);
     const hasRecipe = Array.isArray(prod?.recipe) && prod.recipe.length > 0;
+    const isSharedBaseCategory =
+      prod &&
+      !hasRecipe &&
+      (prod.category === "Minutas" || prod.category === "Licuados");
+
     const sameCategoryCartQty = prod
       ? cart
           .filter((item) => item.category === prod.category)
@@ -986,9 +1008,7 @@ export default function NegocioElCheleApp() {
             if (newQty <= 0) return null;
             if (
               delta > 0 &&
-              prod &&
-              !hasRecipe &&
-              (prod.category === "Minutas" || prod.category === "Licuados") &&
+              isSharedBaseCategory &&
               sameCategoryCartQty >= prod.stock
             ) {
               return item;
@@ -1143,18 +1163,21 @@ export default function NegocioElCheleApp() {
 
     const trayStock = supplies.find((s) => s.id === "s3")?.stock ?? 400;
     const cupStock = supplies.find((s) => s.id === "s1")?.stock ?? 600;
+    const finalCategory = newProdCategory.trim() || "General";
 
     const initialStock =
       newProdStock !== ""
         ? Math.max(0, parseInt(newProdStock, 10) || 0)
-        : newProdCategory === "Minutas"
+        : finalCategory === "Minutas"
         ? trayStock
-        : cupStock;
+        : finalCategory === "Licuados"
+        ? cupStock
+        : 100;
 
     const created = {
       id: Date.now(),
       name: newProdName.trim(),
-      category: newProdCategory,
+      category: finalCategory,
       price: priceVal,
       stock: initialStock,
       description: newProdDesc.trim(),
@@ -1267,7 +1290,7 @@ export default function NegocioElCheleApp() {
         {
           id: `reinv-${Date.now()}`,
           concept: newReinvConcept.trim(),
-          category: newReinvCategory,
+          category: newReinvCategory.trim() || "General",
           amount: amt,
           date: newReinvDate,
         },
@@ -1423,6 +1446,13 @@ export default function NegocioElCheleApp() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 text-slate-800">
+      {/* LISTA DE CATEGORÍAS EXISTENTES PARA AUTOCOMPLETAR O ESCRIBIR */}
+      <datalist id="categorias-existentes">
+        {availableCategories.map((cat) => (
+          <option key={cat} value={cat} />
+        ))}
+      </datalist>
+
       {/* MODAL DE CONTRASEÑA */}
       {pendingAction && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
@@ -1529,16 +1559,17 @@ export default function NegocioElCheleApp() {
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
-                  Categoría
+                  Categoría (elige o escribe)
                 </label>
-                <select
+                <input
+                  type="text"
+                  required
+                  list="categorias-existentes"
                   value={editProdCategory}
                   onChange={(e) => setEditProdCategory(e.target.value)}
+                  placeholder="Elige o escribe una categoría"
                   className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm font-semibold"
-                >
-                  <option value="Minutas">Minutas</option>
-                  <option value="Licuados">Licuados</option>
-                </select>
+                />
               </div>
 
               <div>
@@ -1640,7 +1671,7 @@ export default function NegocioElCheleApp() {
               {editProdRecipe.length === 0 ? (
                 <p className="text-xs text-slate-500">
                   Sin insumos personalizados: al vender descontará la regla base
-                  de categoría (bandeja/vaso y pajilla).
+                  si es Minutas o Licuados, o solo su stock propio.
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -2071,8 +2102,8 @@ export default function NegocioElCheleApp() {
                   />
                 </div>
 
-                <div className="flex gap-1.5">
-                  {["Todos", "Minutas", "Licuados"].map((cat) => (
+                <div className="flex flex-wrap gap-1.5">
+                  {["Todos", ...availableCategories].map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setCategoryFilter(cat)}
@@ -2356,8 +2387,7 @@ export default function NegocioElCheleApp() {
             {/* Productos del Menú */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
               <h3 className="font-bold text-slate-800">
-                Productos del Menú e Insumos Vinculados (Protegido con
-                Negocio2026)
+                Productos del Menú e Insumos Vinculados
               </h3>
 
               <form
@@ -2378,18 +2408,19 @@ export default function NegocioElCheleApp() {
                       className="w-full p-2 border rounded-lg bg-white text-sm"
                     />
                   </div>
-                  <div className="w-36">
+                  <div className="w-44">
                     <label className="block text-xs font-semibold text-slate-600 mb-1">
-                      Categoría
+                      Categoría (elige o escribe)
                     </label>
-                    <select
+                    <input
+                      type="text"
+                      required
+                      list="categorias-existentes"
                       value={newProdCategory}
                       onChange={(e) => setNewProdCategory(e.target.value)}
+                      placeholder="Ej. Minutas, Bebidas..."
                       className="w-full p-2 border rounded-lg bg-white text-sm"
-                    >
-                      <option value="Minutas">Minutas</option>
-                      <option value="Licuados">Licuados</option>
-                    </select>
+                    />
                   </div>
                   <div className="w-28">
                     <label className="block text-xs font-semibold text-slate-600 mb-1">
@@ -2413,7 +2444,13 @@ export default function NegocioElCheleApp() {
                       type="number"
                       value={newProdStock}
                       onChange={(e) => setNewProdStock(e.target.value)}
-                      placeholder={newProdCategory === "Minutas" ? "400" : "600"}
+                      placeholder={
+                        newProdCategory === "Minutas"
+                          ? "400"
+                          : newProdCategory === "Licuados"
+                          ? "600"
+                          : "100"
+                      }
                       className="w-full p-2 border rounded-lg bg-white text-sm"
                     />
                   </div>
@@ -2653,9 +2690,6 @@ export default function NegocioElCheleApp() {
                     vender.
                   </p>
                 </div>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-1 rounded-full">
-                  <Lock size={13} /> Protegido con Negocio2026
-                </span>
               </div>
 
               <form
@@ -3375,16 +3409,14 @@ export default function NegocioElCheleApp() {
                     onChange={(e) => setNewReinvConcept(e.target.value)}
                     className="flex-1 min-w-[140px] p-2 border rounded-lg bg-white text-sm"
                   />
-                  <select
+                  <input
+                    type="text"
+                    list="categorias-existentes"
+                    placeholder="Categoría"
                     value={newReinvCategory}
                     onChange={(e) => setNewReinvCategory(e.target.value)}
-                    className="p-2 border rounded-lg bg-white text-sm"
-                  >
-                    <option value="Minutas">Minutas</option>
-                    <option value="Licuados">Licuados</option>
-                    <option value="Bebidas">Bebidas</option>
-                    <option value="General">General</option>
-                  </select>
+                    className="w-36 p-2 border rounded-lg bg-white text-sm"
+                  />
                   <input
                     type="date"
                     value={newReinvDate}
