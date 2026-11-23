@@ -27,10 +27,9 @@ import {
 
 const OWNER_PASSWORD = "Negocio2026";
 
-// Stock inicial calculado según reglas:
-// - Minutas: 400 (bandejas disponibles)
-// - Vasos de minutas: 300 / 5 opciones de minutas = 60 por opción (referencia de vasos por opción)
-// - Licuados: 600 vasos de 14 oz / 3 sabores = 200 por sabor
+// Stock inicial del menú:
+// - Minutas: comparten el stock de bandejas (400)
+// - Licuados: comparten el stock general de vasos de licuados (600)
 const INITIAL_MENU = [
   {
     id: 1,
@@ -38,7 +37,6 @@ const INITIAL_MENU = [
     category: "Minutas",
     price: 5.0,
     stock: 400,
-    cupAllocation: 60,
     description:
       "Minuta de limon, sal, chile, chamoy, salsa negra, tajin, alguashte, nachos, mango o pepino, chimol, camarones",
   },
@@ -48,7 +46,6 @@ const INITIAL_MENU = [
     category: "Minutas",
     price: 3.0,
     stock: 400,
-    cupAllocation: 60,
     description:
       "Minuta de limon, sal, chile, chamoy, salsa negra, tajin, alguashte, nachos, mango o pepino",
   },
@@ -58,7 +55,6 @@ const INITIAL_MENU = [
     category: "Minutas",
     price: 3.0,
     stock: 400,
-    cupAllocation: 60,
     description:
       "Minuta de Jarabes de tu elección, leche condensada, gomitas y pixie",
   },
@@ -68,7 +64,6 @@ const INITIAL_MENU = [
     category: "Minutas",
     price: 2.0,
     stock: 400,
-    cupAllocation: 60,
     description:
       "Minuta de Jarabes de tu elección con fruta picada (guineo y piña) y jalea de tamarindo o leche condensada",
   },
@@ -78,7 +73,6 @@ const INITIAL_MENU = [
     category: "Minutas",
     price: 1.5,
     stock: 400,
-    cupAllocation: 60,
     description:
       "Minuta de limon, sal, chile, chamoy, salsa negra, tajin, alguashte",
   },
@@ -87,32 +81,30 @@ const INITIAL_MENU = [
     name: "Licuado de guineo",
     category: "Licuados",
     price: 2.0,
-    stock: 200,
-    cupAllocation: 200,
-    description: "Licuado de guineo preparado con leche (vaso 14 oz)",
+    stock: 600,
+    description: "Licuado de guineo preparado con leche",
   },
   {
     id: 7,
     name: "Licuado de fresa",
     category: "Licuados",
     price: 2.0,
-    stock: 200,
-    cupAllocation: 200,
-    description: "Licuado de fresa preparado con leche (vaso 14 oz)",
+    stock: 600,
+    description: "Licuado de fresa preparado con leche",
   },
   {
     id: 8,
     name: "Licuado de Oreo",
     category: "Licuados",
     price: 2.0,
-    stock: 200,
-    cupAllocation: 200,
-    description: "Licuado de galleta Oreo preparado con leche (vaso 14 oz)",
+    stock: 600,
+    description: "Licuado de galleta Oreo preparado con leche",
   },
 ];
 
+// Cantidades limpias (sin peso en nombres) para camarones, sal, chile, alguashte, hielo y demás insumos
 const INITIAL_SUPPLIES = [
-  { id: "s1", name: "vasos de licuados (14 oz)", type: "Empaques", stock: 600 },
+  { id: "s1", name: "vasos de licuados", type: "Empaques", stock: 600 },
   { id: "s2", name: "vasos de minutas", type: "Empaques", stock: 300 },
   { id: "s3", name: "bandeja 11,1x11,1,x6,3", type: "Empaques", stock: 400 },
   { id: "s4", name: "stickers", type: "Empaques", stock: 0 },
@@ -157,7 +149,7 @@ const INITIAL_SUPPLIES = [
   { id: "s38", name: "Camaron (lote 2)", type: "Materia Prima", stock: 2000 },
   {
     id: "s39",
-    name: "agua alpina en botella 699ml",
+    name: "agua alpina en botella",
     type: "Materia Prima",
     stock: 72,
   },
@@ -254,6 +246,24 @@ const INITIAL_FINANCIAL = {
   reinvestments: [],
 };
 
+// Sincroniza el stock visible de cada producto con el empaque compartido correspondiente:
+// - Minutas -> bandejas disponibles (s3)
+// - Licuados -> vasos de licuados disponibles (s1)
+function syncProductsWithSharedSupplies(prodList, supList) {
+  const traySup = supList.find((s) => s.id === "s3");
+  const licuadoCupSup = supList.find((s) => s.id === "s1");
+
+  return prodList.map((p) => {
+    if (p.category === "Minutas" && traySup) {
+      return { ...p, stock: traySup.stock };
+    }
+    if (p.category === "Licuados" && licuadoCupSup) {
+      return { ...p, stock: licuadoCupSup.stock };
+    }
+    return p;
+  });
+}
+
 export default function NegocioElCheleApp() {
   const [activeTab, setActiveTab] = useState("pos");
   const [products, setProducts] = useState([]);
@@ -309,14 +319,21 @@ export default function NegocioElCheleApp() {
   const [extraPayAmount, setExtraPayAmount] = useState("");
 
   useEffect(() => {
-    const savedProducts = localStorage.getItem("chele_v5_products");
-    const savedSupplies = localStorage.getItem("chele_v5_supplies");
-    const savedInvLogs = localStorage.getItem("chele_v5_inv_logs");
-    const savedSales = localStorage.getItem("chele_v5_sales");
-    const savedFinancial = localStorage.getItem("chele_v5_financial");
+    const savedProducts = localStorage.getItem("chele_v6_products");
+    const savedSupplies = localStorage.getItem("chele_v6_supplies");
+    const savedInvLogs = localStorage.getItem("chele_v6_inv_logs");
+    const savedSales = localStorage.getItem("chele_v6_sales");
+    const savedFinancial = localStorage.getItem("chele_v6_financial");
 
-    setProducts(savedProducts ? JSON.parse(savedProducts) : INITIAL_MENU);
-    setSupplies(savedSupplies ? JSON.parse(savedSupplies) : INITIAL_SUPPLIES);
+    const loadedSupplies = savedSupplies
+      ? JSON.parse(savedSupplies)
+      : INITIAL_SUPPLIES;
+    const loadedProducts = savedProducts
+      ? JSON.parse(savedProducts)
+      : INITIAL_MENU;
+
+    setSupplies(loadedSupplies);
+    setProducts(syncProductsWithSharedSupplies(loadedProducts, loadedSupplies));
     setInventoryLogs(savedInvLogs ? JSON.parse(savedInvLogs) : []);
     setSales(savedSales ? JSON.parse(savedSales) : []);
     setFinancial(
@@ -326,26 +343,26 @@ export default function NegocioElCheleApp() {
 
   useEffect(() => {
     if (products.length > 0) {
-      localStorage.setItem("chele_v5_products", JSON.stringify(products));
+      localStorage.setItem("chele_v6_products", JSON.stringify(products));
     }
   }, [products]);
 
   useEffect(() => {
     if (supplies.length > 0) {
-      localStorage.setItem("chele_v5_supplies", JSON.stringify(supplies));
+      localStorage.setItem("chele_v6_supplies", JSON.stringify(supplies));
     }
   }, [supplies]);
 
   useEffect(() => {
-    localStorage.setItem("chele_v5_inv_logs", JSON.stringify(inventoryLogs));
+    localStorage.setItem("chele_v6_inv_logs", JSON.stringify(inventoryLogs));
   }, [inventoryLogs]);
 
   useEffect(() => {
-    localStorage.setItem("chele_v5_sales", JSON.stringify(sales));
+    localStorage.setItem("chele_v6_sales", JSON.stringify(sales));
   }, [sales]);
 
   useEffect(() => {
-    localStorage.setItem("chele_v5_financial", JSON.stringify(financial));
+    localStorage.setItem("chele_v6_financial", JSON.stringify(financial));
   }, [financial]);
 
   // --- CONTRASEÑA ---
@@ -433,6 +450,7 @@ export default function NegocioElCheleApp() {
     }
 
     setSupplies(updatedSupplies);
+    setProducts(syncProductsWithSharedSupplies(products, updatedSupplies));
 
     const newLogEntry = {
       id: `log-${Date.now()}`,
@@ -450,15 +468,27 @@ export default function NegocioElCheleApp() {
   // --- VENTAS Y CARRITO ---
   const addToCart = (product) => {
     if (product.stock <= 0) return;
+
+    // Para productos que comparten stock (Minutas -> bandejas, Licuados -> vasos de licuados),
+    // sumamos todas las unidades de esa misma categoría en el carrito para no exceder el stock compartido.
+    const sameCategoryCartQty = cart
+      .filter((item) => item.category === product.category)
+      .reduce((sum, item) => sum + item.qty, 0);
+
     const existing = cart.find((item) => item.id === product.id);
+    const maxAllowed =
+      product.category === "Minutas" || product.category === "Licuados"
+        ? product.stock
+        : product.stock;
+
+    if (sameCategoryCartQty >= maxAllowed) return;
+
     if (existing) {
-      if (existing.qty < product.stock) {
-        setCart(
-          cart.map((item) =>
-            item.id === product.id ? { ...item, qty: item.qty + 1 } : item
-          )
-        );
-      }
+      setCart(
+        cart.map((item) =>
+          item.id === product.id ? { ...item, qty: item.qty + 1 } : item
+        )
+      );
     } else {
       setCart([...cart, { ...product, qty: 1 }]);
     }
@@ -466,12 +496,26 @@ export default function NegocioElCheleApp() {
 
   const updateCartQty = (id, delta) => {
     const prod = products.find((p) => p.id === id);
+    const sameCategoryCartQty = prod
+      ? cart
+          .filter((item) => item.category === prod.category)
+          .reduce((sum, item) => sum + item.qty, 0)
+      : 0;
+
     setCart(
       cart
         .map((item) => {
           if (item.id === id) {
             const newQty = item.qty + delta;
             if (newQty <= 0) return null;
+            if (
+              delta > 0 &&
+              prod &&
+              (prod.category === "Minutas" || prod.category === "Licuados") &&
+              sameCategoryCartQty >= prod.stock
+            ) {
+              return item;
+            }
             if (prod && newQty > prod.stock) return item;
             return { ...item, qty: newQty };
           }
@@ -488,6 +532,9 @@ export default function NegocioElCheleApp() {
       ? cashNum - cartTotal
       : 0;
 
+  // Al completar venta:
+  // - Minutas descuentan de bandejas (s3), vasos de minutas (s2) y pajillas (s8/s7)
+  // - Licuados descuentan de vasos de licuados (s1) y pajillas (s8/s7)
   const handleCompleteSale = () => {
     if (cart.length === 0) return;
     if (
@@ -498,13 +545,56 @@ export default function NegocioElCheleApp() {
       return;
     }
 
-    const updatedProducts = products.map((prod) => {
-      const sold = cart.find((c) => c.id === prod.id);
-      if (sold) {
-        return { ...prod, stock: Math.max(0, prod.stock - sold.qty) };
+    const minutasSold = cart
+      .filter((c) => c.category === "Minutas")
+      .reduce((sum, c) => sum + c.qty, 0);
+
+    const licuadosSold = cart
+      .filter((c) => c.category === "Licuados")
+      .reduce((sum, c) => sum + c.qty, 0);
+
+    const updatedSupplies = supplies.map((sup) => {
+      let deduction = 0;
+
+      if (sup.id === "s3" && minutasSold > 0) {
+        // Bandejas compartidas por todas las minutas
+        deduction += minutasSold;
       }
-      return prod;
+      if (sup.id === "s2" && minutasSold > 0) {
+        // Vasos de minutas compartidos
+        deduction += minutasSold;
+      }
+      if (sup.id === "s1" && licuadosSold > 0) {
+        // Vasos de licuados compartidos (guineo, fresa, oreo, etc.)
+        deduction += licuadosSold;
+      }
+      // Pajillas con emboltorio (s8) para minutas y licuados
+      if (sup.id === "s8" && minutasSold + licuadosSold > 0) {
+        deduction += minutasSold + licuadosSold;
+      }
+
+      if (deduction > 0) {
+        return { ...sup, stock: Math.max(0, sup.stock - deduction) };
+      }
+      return sup;
     });
+
+    setSupplies(updatedSupplies);
+
+    const updatedProducts = syncProductsWithSharedSupplies(
+      products.map((prod) => {
+        if (prod.category === "Minutas" || prod.category === "Licuados") {
+          return prod;
+        }
+        const sold = cart.find((c) => c.id === prod.id);
+        if (sold) {
+          return { ...prod, stock: Math.max(0, prod.stock - sold.qty) };
+        }
+        return prod;
+      }),
+      updatedSupplies
+    );
+
     setProducts(updatedProducts);
 
     const newSale = {
@@ -546,30 +636,51 @@ export default function NegocioElCheleApp() {
       return;
     }
     const parsed = parseInt(rawValue, 10);
-    setProducts(
-      products.map((p) =>
-        p.id === productId
-          ? { ...p, stock: Number.isNaN(parsed) ? 0 : Math.max(0, parsed) }
-          : p
-      )
-    );
+    const cleanVal = Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
+    const targetProd = products.find((p) => p.id === productId);
+
+    if (!targetProd) return;
+
+    if (targetProd.category === "Minutas") {
+      const nextSupplies = supplies.map((s) =>
+        s.id === "s3" ? { ...s, stock: cleanVal } : s
+      );
+      setSupplies(nextSupplies);
+      setProducts(syncProductsWithSharedSupplies(products, nextSupplies));
+    } else if (targetProd.category === "Licuados") {
+      const nextSupplies = supplies.map((s) =>
+        s.id === "s1" ? { ...s, stock: cleanVal } : s
+      );
+      setSupplies(nextSupplies);
+      setProducts(syncProductsWithSharedSupplies(products, nextSupplies));
+    } else {
+      setProducts(
+        products.map((p) =>
+          p.id === productId ? { ...p, stock: cleanVal } : p
+        )
+      );
+    }
   };
 
   const handleAddProduct = (e) => {
     e.preventDefault();
     if (!newProdName.trim()) return;
     const priceVal = parseFloat(newProdPrice) || 0;
-    const defaultStock =
-      newProdStock !== ""
-        ? parseInt(newProdStock, 10) || 0
-        : newProdCategory === "Minutas"
-        ? 400
-        : 200;
 
     if (!priceAndStockUnlocked && (priceVal > 0 || newProdStock !== "")) {
       openPasswordModal("priceAndStock");
       return;
     }
+
+    const trayStock = supplies.find((s) => s.id === "s3")?.stock ?? 400;
+    const cupStock = supplies.find((s) => s.id === "s1")?.stock ?? 600;
+
+    const initialStock =
+      newProdCategory === "Minutas"
+        ? trayStock
+        : newProdCategory === "Licuados"
+        ? cupStock
+        : parseInt(newProdStock, 10) || 0;
 
     setProducts([
       ...products,
@@ -578,8 +689,7 @@ export default function NegocioElCheleApp() {
         name: newProdName.trim(),
         category: newProdCategory,
         price: priceVal,
-        stock: defaultStock,
-        cupAllocation: newProdCategory === "Licuados" ? 200 : 60,
+        stock: initialStock,
         description: "",
       },
     ]);
@@ -1305,7 +1415,8 @@ export default function NegocioElCheleApp() {
 
                 {saleSuccess && (
                   <div className="flex items-center justify-center gap-2 text-green-800 bg-green-100 p-2.5 rounded-xl text-sm font-semibold">
-                    <CheckCircle2 size={18} /> ¡Venta guardada!
+                    <CheckCircle2 size={18} /> ¡Venta guardada e inventario
+                    descontado!
                   </div>
                 )}
               </div>
@@ -1322,10 +1433,10 @@ export default function NegocioElCheleApp() {
                   Inventario Diario y Control de Stock
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Minutas inician con <strong>400</strong> bandejas (60 vasos de
-                  minuta por opción) y Licuados con <strong>200</strong> por
-                  sabor (600 vasos de 14 oz ÷ 3). El stock de insumos solo se
-                  modifica con <strong>Actualizar inventario</strong>.
+                  Las minutas comparten el stock de bandejas (<strong>400</strong>
+                  ) y los licuados comparten el stock general de vasos (
+                  <strong>600</strong>). Al vender, se descuentan
+                  automáticamente las bandejas/vasos y pajillas.
                 </p>
               </div>
 
@@ -1430,7 +1541,7 @@ export default function NegocioElCheleApp() {
                     type="number"
                     value={newProdStock}
                     onChange={(e) => setNewProdStock(e.target.value)}
-                    placeholder={newProdCategory === "Minutas" ? "400" : "200"}
+                    placeholder={newProdCategory === "Minutas" ? "400" : "600"}
                     className="w-full p-2 border rounded-lg bg-white text-sm"
                   />
                 </div>
@@ -1449,7 +1560,7 @@ export default function NegocioElCheleApp() {
                       <th className="p-3">Producto</th>
                       <th className="p-3">Categoría</th>
                       <th className="p-3">Precio ($)</th>
-                      <th className="p-3">Stock Inicial / Disp.</th>
+                      <th className="p-3">Stock Compartido / Disp.</th>
                       <th className="p-3 text-right">Eliminar</th>
                     </tr>
                   </thead>
@@ -1541,9 +1652,8 @@ export default function NegocioElCheleApp() {
                     Materiales e Insumos (Empaques y Materia Prima)
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Stock protegido contra edición directa. Usa{" "}
-                    <strong>Actualizar inventario</strong> arriba para
-                    modificarlo.
+                    Se descuentan automáticamente al registrar ventas y se pueden
+                    ajustar con <strong>Actualizar inventario</strong>.
                   </p>
                 </div>
                 <span className="inline-flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-1 rounded-full">
