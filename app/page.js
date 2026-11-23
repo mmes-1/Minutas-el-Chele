@@ -8,7 +8,6 @@ import {
   Wallet,
   Lock,
   Unlock,
-  Upload,
   Download,
   Plus,
   Minus,
@@ -22,18 +21,24 @@ import {
   ClipboardCheck,
   Calendar,
   AlertCircle,
+  Target,
   X,
 } from "lucide-react";
 
 const OWNER_PASSWORD = "Negocio2026";
 
+// Stock inicial calculado según reglas:
+// - Minutas: 400 (bandejas disponibles)
+// - Vasos de minutas: 300 / 5 opciones de minutas = 60 por opción (referencia de vasos por opción)
+// - Licuados: 600 vasos de 14 oz / 3 sabores = 200 por sabor
 const INITIAL_MENU = [
   {
     id: 1,
     name: "Ceviminuta",
     category: "Minutas",
     price: 5.0,
-    stock: 40,
+    stock: 400,
+    cupAllocation: 60,
     description:
       "Minuta de limon, sal, chile, chamoy, salsa negra, tajin, alguashte, nachos, mango o pepino, chimol, camarones",
   },
@@ -42,7 +47,8 @@ const INITIAL_MENU = [
     name: "Limon y fruta",
     category: "Minutas",
     price: 3.0,
-    stock: 50,
+    stock: 400,
+    cupAllocation: 60,
     description:
       "Minuta de limon, sal, chile, chamoy, salsa negra, tajin, alguashte, nachos, mango o pepino",
   },
@@ -51,7 +57,8 @@ const INITIAL_MENU = [
     name: "Tadicional con gomitas",
     category: "Minutas",
     price: 3.0,
-    stock: 50,
+    stock: 400,
+    cupAllocation: 60,
     description:
       "Minuta de Jarabes de tu elección, leche condensada, gomitas y pixie",
   },
@@ -60,7 +67,8 @@ const INITIAL_MENU = [
     name: "Tadicional con fruta",
     category: "Minutas",
     price: 2.0,
-    stock: 50,
+    stock: 400,
+    cupAllocation: 60,
     description:
       "Minuta de Jarabes de tu elección con fruta picada (guineo y piña) y jalea de tamarindo o leche condensada",
   },
@@ -69,7 +77,8 @@ const INITIAL_MENU = [
     name: "Tradicional de limon",
     category: "Minutas",
     price: 1.5,
-    stock: 60,
+    stock: 400,
+    cupAllocation: 60,
     description:
       "Minuta de limon, sal, chile, chamoy, salsa negra, tajin, alguashte",
   },
@@ -78,30 +87,32 @@ const INITIAL_MENU = [
     name: "Licuado de guineo",
     category: "Licuados",
     price: 2.0,
-    stock: 40,
-    description: "Licuado de guineo preparado con leche",
+    stock: 200,
+    cupAllocation: 200,
+    description: "Licuado de guineo preparado con leche (vaso 14 oz)",
   },
   {
     id: 7,
     name: "Licuado de fresa",
     category: "Licuados",
     price: 2.0,
-    stock: 40,
-    description: "Licuado de fresa preparado con leche",
+    stock: 200,
+    cupAllocation: 200,
+    description: "Licuado de fresa preparado con leche (vaso 14 oz)",
   },
   {
     id: 8,
     name: "Licuado de Oreo",
     category: "Licuados",
     price: 2.0,
-    stock: 40,
-    description: "Licuado de galleta Oreo preparado con leche",
+    stock: 200,
+    cupAllocation: 200,
+    description: "Licuado de galleta Oreo preparado con leche (vaso 14 oz)",
   },
 ];
 
-// Inventario inicial tomado de "Inventario Of." del Excel
 const INITIAL_SUPPLIES = [
-  { id: "s1", name: "vasos de licuados", type: "Empaques", stock: 600 },
+  { id: "s1", name: "vasos de licuados (14 oz)", type: "Empaques", stock: 600 },
   { id: "s2", name: "vasos de minutas", type: "Empaques", stock: 300 },
   { id: "s3", name: "bandeja 11,1x11,1,x6,3", type: "Empaques", stock: 400 },
   { id: "s4", name: "stickers", type: "Empaques", stock: 0 },
@@ -260,19 +271,19 @@ export default function NegocioElCheleApp() {
   const [cashGiven, setCashGiven] = useState("");
   const [saleSuccess, setSaleSuccess] = useState(false);
 
-  // Contraseña para Financiero y Precios
-  const [pricesUnlocked, setPricesUnlocked] = useState(false);
+  // Contraseña única para desbloquear Precio y Stock inicial del menú, o sección Financiero
+  const [priceAndStockUnlocked, setPriceAndStockUnlocked] = useState(false);
   const [financialUnlocked, setFinancialUnlocked] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [pendingAction, setPendingAction] = useState(null); // 'prices' | 'financial'
+  const [pendingAction, setPendingAction] = useState(null); // 'priceAndStock' | 'financial'
 
   // Modal "Actualizar inventario"
   const [updateInvModalOpen, setUpdateInvModalOpen] = useState(false);
   const [invUpdateDate, setInvUpdateDate] = useState(
     new Date().toISOString().slice(0, 10)
   );
-  const [invUpdateMode, setInvUpdateMode] = useState("entrada"); // 'entrada' | 'salida' | 'conteo'
+  const [invUpdateMode, setInvUpdateMode] = useState("entrada");
   const [invUpdateNote, setInvUpdateNote] = useState("");
   const [invDraftInputs, setInvDraftInputs] = useState({});
 
@@ -282,7 +293,7 @@ export default function NegocioElCheleApp() {
   const [newProdPrice, setNewProdPrice] = useState("");
   const [newProdStock, setNewProdStock] = useState("");
 
-  // Nuevos registros financieros (deuda / reinversión / fecha de pago)
+  // Nuevos registros financieros
   const [newDebtConcept, setNewDebtConcept] = useState("");
   const [newDebtAmount, setNewDebtAmount] = useState("");
   const [newDebtDate, setNewDebtDate] = useState("2026-12-15");
@@ -298,11 +309,11 @@ export default function NegocioElCheleApp() {
   const [extraPayAmount, setExtraPayAmount] = useState("");
 
   useEffect(() => {
-    const savedProducts = localStorage.getItem("chele_v3_products");
-    const savedSupplies = localStorage.getItem("chele_v3_supplies");
-    const savedInvLogs = localStorage.getItem("chele_v3_inv_logs");
-    const savedSales = localStorage.getItem("chele_v3_sales");
-    const savedFinancial = localStorage.getItem("chele_v3_financial");
+    const savedProducts = localStorage.getItem("chele_v5_products");
+    const savedSupplies = localStorage.getItem("chele_v5_supplies");
+    const savedInvLogs = localStorage.getItem("chele_v5_inv_logs");
+    const savedSales = localStorage.getItem("chele_v5_sales");
+    const savedFinancial = localStorage.getItem("chele_v5_financial");
 
     setProducts(savedProducts ? JSON.parse(savedProducts) : INITIAL_MENU);
     setSupplies(savedSupplies ? JSON.parse(savedSupplies) : INITIAL_SUPPLIES);
@@ -315,26 +326,26 @@ export default function NegocioElCheleApp() {
 
   useEffect(() => {
     if (products.length > 0) {
-      localStorage.setItem("chele_v3_products", JSON.stringify(products));
+      localStorage.setItem("chele_v5_products", JSON.stringify(products));
     }
   }, [products]);
 
   useEffect(() => {
     if (supplies.length > 0) {
-      localStorage.setItem("chele_v3_supplies", JSON.stringify(supplies));
+      localStorage.setItem("chele_v5_supplies", JSON.stringify(supplies));
     }
   }, [supplies]);
 
   useEffect(() => {
-    localStorage.setItem("chele_v3_inv_logs", JSON.stringify(inventoryLogs));
+    localStorage.setItem("chele_v5_inv_logs", JSON.stringify(inventoryLogs));
   }, [inventoryLogs]);
 
   useEffect(() => {
-    localStorage.setItem("chele_v3_sales", JSON.stringify(sales));
+    localStorage.setItem("chele_v5_sales", JSON.stringify(sales));
   }, [sales]);
 
   useEffect(() => {
-    localStorage.setItem("chele_v3_financial", JSON.stringify(financial));
+    localStorage.setItem("chele_v5_financial", JSON.stringify(financial));
   }, [financial]);
 
   // --- CONTRASEÑA ---
@@ -347,8 +358,8 @@ export default function NegocioElCheleApp() {
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
     if (passwordInput === OWNER_PASSWORD) {
-      if (pendingAction === "prices") {
-        setPricesUnlocked(true);
+      if (pendingAction === "priceAndStock") {
+        setPriceAndStockUnlocked(true);
       } else if (pendingAction === "financial") {
         setFinancialUnlocked(true);
         setActiveTab("financial");
@@ -361,7 +372,7 @@ export default function NegocioElCheleApp() {
     }
   };
 
-  // --- ACTUALIZAR INVENTARIO CON HISTORIAL ---
+  // --- ACTUALIZAR INVENTARIO DE INSUMOS CON HISTORIAL ---
   const openUpdateInventoryModal = () => {
     const initialMap = {};
     supplies.forEach((s) => {
@@ -513,10 +524,10 @@ export default function NegocioElCheleApp() {
     setTimeout(() => setSaleSuccess(false), 3000);
   };
 
-  // --- PRECIOS PROTEGIDOS ---
-  const handlePriceChange = (productId, rawValue) => {
-    if (!pricesUnlocked) {
-      openPasswordModal("prices");
+  // --- PRECIO Y STOCK INICIAL PROTEGIDOS POR EL MISMO BOTÓN ---
+  const handleProtectedPriceChange = (productId, rawValue) => {
+    if (!priceAndStockUnlocked) {
+      openPasswordModal("priceAndStock");
       return;
     }
     const parsed = parseFloat(rawValue);
@@ -529,22 +540,46 @@ export default function NegocioElCheleApp() {
     );
   };
 
+  const handleProtectedStockChange = (productId, rawValue) => {
+    if (!priceAndStockUnlocked) {
+      openPasswordModal("priceAndStock");
+      return;
+    }
+    const parsed = parseInt(rawValue, 10);
+    setProducts(
+      products.map((p) =>
+        p.id === productId
+          ? { ...p, stock: Number.isNaN(parsed) ? 0 : Math.max(0, parsed) }
+          : p
+      )
+    );
+  };
+
   const handleAddProduct = (e) => {
     e.preventDefault();
     if (!newProdName.trim()) return;
-    const priceVal = parseFloat(newProdPrice);
-    if (!pricesUnlocked && priceVal > 0) {
-      openPasswordModal("prices");
+    const priceVal = parseFloat(newProdPrice) || 0;
+    const defaultStock =
+      newProdStock !== ""
+        ? parseInt(newProdStock, 10) || 0
+        : newProdCategory === "Minutas"
+        ? 400
+        : 200;
+
+    if (!priceAndStockUnlocked && (priceVal > 0 || newProdStock !== "")) {
+      openPasswordModal("priceAndStock");
       return;
     }
+
     setProducts([
       ...products,
       {
         id: Date.now(),
         name: newProdName.trim(),
         category: newProdCategory,
-        price: Number.isNaN(priceVal) ? 0 : priceVal,
-        stock: parseInt(newProdStock, 10) || 0,
+        price: priceVal,
+        stock: defaultStock,
+        cupAllocation: newProdCategory === "Licuados" ? 200 : 60,
         description: "",
       },
     ]);
@@ -729,6 +764,17 @@ export default function NegocioElCheleApp() {
   // --- CÁLCULOS FINANCIEROS ---
   const totalSold = sales.reduce((acc, s) => acc + s.total, 0);
 
+  const totalCashSales = sales
+    .filter((s) => s.paymentMethod === "Efectivo")
+    .reduce((acc, s) => acc + s.total, 0);
+
+  const totalDigitalSales = totalSold - totalCashSales;
+
+  const totalReinvestments = financial.reinvestments.reduce(
+    (sum, r) => sum + (parseFloat(r.amount) || 0),
+    0
+  );
+
   const pendingEmployeePay = financial.employees.reduce((sum, emp) => {
     return (
       sum +
@@ -751,14 +797,29 @@ export default function NegocioElCheleApp() {
     .filter((d) => !d.paid)
     .reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
 
-  const totalReinvestments = financial.reinvestments.reduce(
-    (sum, r) => sum + (parseFloat(r.amount) || 0),
-    0
-  );
+  const paidOtherDebts = financial.otherDebts
+    .filter((d) => d.paid)
+    .reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
 
-  // Dinero disponible real en caja (ventas menos pagos ya realizados y reinversiones)
-  const availableCash = totalSold - paidEmployeePay - totalReinvestments;
-  const totalPendingObligations = pendingEmployeePay + pendingOtherDebts;
+  const totalPaymentsMade = paidEmployeePay + paidOtherDebts;
+  const totalPendingDebtsAndSalaries = pendingEmployeePay + pendingOtherDebts;
+
+  const netCashInDrawer =
+    totalCashSales - totalReinvestments - totalPaymentsMade;
+
+  const availableCash = totalSold - totalReinvestments - totalPaymentsMade;
+
+  const goalTarget = parseFloat(financial.goal) || 7000;
+  const netTowardGoal =
+    totalSold -
+    totalPendingDebtsAndSalaries -
+    totalReinvestments -
+    totalPaymentsMade;
+  const remainingForGoal = Math.max(0, goalTarget - netTowardGoal);
+  const goalProgressPct = Math.min(
+    100,
+    Math.max(0, (netTowardGoal / (goalTarget || 1)) * 100)
+  );
 
   const filteredProducts = products.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
@@ -781,11 +842,13 @@ export default function NegocioElCheleApp() {
               <span>
                 {pendingAction === "financial"
                   ? "Acceso a Financiero"
-                  : "Modificar Precios"}
+                  : "Desbloquear Precio y Stock Inicial"}
               </span>
             </div>
             <p className="text-sm text-slate-600">
-              Ingresa la contraseña del dueño para continuar.
+              {pendingAction === "financial"
+                ? "Ingresa la contraseña del dueño para acceder al panel financiero."
+                : "Ingresa la contraseña del dueño para modificar precios o colocar el stock inicial del menú."}
             </p>
             <input
               type="password"
@@ -1090,7 +1153,7 @@ export default function NegocioElCheleApp() {
                       </span>
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                          product.stock > 10
+                          product.stock > 20
                             ? "bg-green-100 text-green-800"
                             : product.stock > 0
                             ? "bg-amber-100 text-amber-800"
@@ -1250,7 +1313,7 @@ export default function NegocioElCheleApp() {
           </div>
         )}
 
-        {/* 2. INVENTARIO DIARIO Y PRECIOS PROTEGIDOS */}
+        {/* 2. INVENTARIO DIARIO Y PRECIOS / STOCK INICIAL PROTEGIDOS */}
         {activeTab === "inventory" && (
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
@@ -1259,9 +1322,10 @@ export default function NegocioElCheleApp() {
                   Inventario Diario y Control de Stock
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Inicia con tu inventario del Excel. Para evitar errores
-                  manuales, el stock de insumos solo cambia usando{" "}
-                  <strong>Actualizar inventario</strong>.
+                  Minutas inician con <strong>400</strong> bandejas (60 vasos de
+                  minuta por opción) y Licuados con <strong>200</strong> por
+                  sabor (600 vasos de 14 oz ÷ 3). El stock de insumos solo se
+                  modifica con <strong>Actualizar inventario</strong>.
                 </p>
               </div>
 
@@ -1277,20 +1341,24 @@ export default function NegocioElCheleApp() {
                 <button
                   type="button"
                   onClick={() =>
-                    pricesUnlocked
-                      ? setPricesUnlocked(false)
-                      : openPasswordModal("prices")
+                    priceAndStockUnlocked
+                      ? setPriceAndStockUnlocked(false)
+                      : openPasswordModal("priceAndStock")
                   }
                   className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold border transition ${
-                    pricesUnlocked
+                    priceAndStockUnlocked
                       ? "bg-amber-100 border-amber-400 text-amber-900"
                       : "bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200"
                   }`}
                 >
-                  {pricesUnlocked ? <Unlock size={16} /> : <Lock size={16} />}
-                  {pricesUnlocked
-                    ? "Precios Desbloqueados"
-                    : "Desbloquear Precios"}
+                  {priceAndStockUnlocked ? (
+                    <Unlock size={16} />
+                  ) : (
+                    <Lock size={16} />
+                  )}
+                  {priceAndStockUnlocked
+                    ? "Precio / Stock Desbloqueados"
+                    : "Desbloquear Precio / Stock"}
                 </button>
 
                 <button
@@ -1306,7 +1374,8 @@ export default function NegocioElCheleApp() {
             {/* Productos del Menú */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
               <h3 className="font-bold text-slate-800">
-                Productos del Menú (Precios protegidos con Negocio2026)
+                Productos del Menú (Precio y Stock Inicial protegidos con
+                Negocio2026)
               </h3>
 
               <form
@@ -1353,16 +1422,15 @@ export default function NegocioElCheleApp() {
                     className="w-full p-2 border rounded-lg bg-white text-sm"
                   />
                 </div>
-                <div className="w-28">
+                <div className="w-32">
                   <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Stock
+                    Stock Inicial
                   </label>
                   <input
                     type="number"
-                    required
                     value={newProdStock}
                     onChange={(e) => setNewProdStock(e.target.value)}
-                    placeholder="20"
+                    placeholder={newProdCategory === "Minutas" ? "400" : "200"}
                     className="w-full p-2 border rounded-lg bg-white text-sm"
                   />
                 </div>
@@ -1381,7 +1449,7 @@ export default function NegocioElCheleApp() {
                       <th className="p-3">Producto</th>
                       <th className="p-3">Categoría</th>
                       <th className="p-3">Precio ($)</th>
-                      <th className="p-3">Stock</th>
+                      <th className="p-3">Stock Inicial / Disp.</th>
                       <th className="p-3 text-right">Eliminar</th>
                     </tr>
                   </thead>
@@ -1396,26 +1464,56 @@ export default function NegocioElCheleApp() {
                             <input
                               type="number"
                               step="0.01"
-                              readOnly={!pricesUnlocked}
+                              readOnly={!priceAndStockUnlocked}
                               onClick={() => {
-                                if (!pricesUnlocked) openPasswordModal("prices");
+                                if (!priceAndStockUnlocked)
+                                  openPasswordModal("priceAndStock");
                               }}
                               value={prod.price}
                               onChange={(e) =>
-                                handlePriceChange(prod.id, e.target.value)
+                                handleProtectedPriceChange(
+                                  prod.id,
+                                  e.target.value
+                                )
                               }
                               className={`w-24 p-1.5 border rounded-lg font-bold ${
-                                pricesUnlocked
+                                priceAndStockUnlocked
                                   ? "bg-white border-amber-400"
                                   : "bg-slate-100 border-slate-200 cursor-pointer"
                               }`}
                             />
-                            {!pricesUnlocked && (
+                            {!priceAndStockUnlocked && (
                               <Lock size={14} className="text-slate-400" />
                             )}
                           </div>
                         </td>
-                        <td className="p-3 font-bold">{prod.stock}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              readOnly={!priceAndStockUnlocked}
+                              onClick={() => {
+                                if (!priceAndStockUnlocked)
+                                  openPasswordModal("priceAndStock");
+                              }}
+                              value={prod.stock}
+                              onChange={(e) =>
+                                handleProtectedStockChange(
+                                  prod.id,
+                                  e.target.value
+                                )
+                              }
+                              className={`w-24 p-1.5 border rounded-lg font-bold ${
+                                priceAndStockUnlocked
+                                  ? "bg-white border-amber-400"
+                                  : "bg-slate-100 border-slate-200 cursor-pointer"
+                              }`}
+                            />
+                            {!priceAndStockUnlocked && (
+                              <Lock size={14} className="text-slate-400" />
+                            )}
+                          </div>
+                        </td>
                         <td className="p-3 text-right">
                           <button
                             onClick={() =>
@@ -1435,7 +1533,7 @@ export default function NegocioElCheleApp() {
               </div>
             </div>
 
-            {/* Materiales e Insumos (Stock bloqueado para edición directa) */}
+            {/* Materiales e Insumos */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
               <div className="flex flex-wrap justify-between items-center gap-2">
                 <div>
@@ -1444,7 +1542,8 @@ export default function NegocioElCheleApp() {
                   </h3>
                   <p className="text-xs text-slate-500">
                     Stock protegido contra edición directa. Usa{" "}
-                    <strong>Actualizar inventario</strong> arriba para modificarlo.
+                    <strong>Actualizar inventario</strong> arriba para
+                    modificarlo.
                   </p>
                 </div>
                 <span className="inline-flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-1 rounded-full">
@@ -1611,8 +1710,8 @@ export default function NegocioElCheleApp() {
                 <div>
                   <h2 className="text-lg font-bold">Control Financiero</h2>
                   <p className="text-xs text-slate-500">
-                    Disponibilidad de pagos, fechas de Kat y Gab, deudas y
-                    reinversiones
+                    Meta general, efectivo neto descontando reinversión, fechas
+                    de Kat y Gab, deudas y pagos
                   </p>
                 </div>
               </div>
@@ -1628,24 +1727,150 @@ export default function NegocioElCheleApp() {
               </button>
             </div>
 
-            {/* Indicadores clave */}
+            {/* BLOQUE DEDICADO A LA META GENERAL ($7,000) */}
+            <div className="bg-gradient-to-r from-blue-900 to-blue-800 text-white p-6 rounded-2xl shadow-md space-y-4">
+              <div className="flex flex-wrap justify-between items-start gap-4">
+                <div className="flex items-center gap-2.5">
+                  <Target className="text-amber-300" size={26} />
+                  <div>
+                    <h3 className="text-lg font-bold">
+                      Meta General del Negocio
+                    </h3>
+                    <p className="text-xs text-blue-200">
+                      Resultado neto tras restar deudas, reinversiones y pagos
+                      en general
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-blue-950/60 px-3.5 py-2 rounded-xl border border-blue-700">
+                  <label className="block text-[11px] uppercase text-blue-200 font-semibold">
+                    Objetivo Meta ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={financial.goal}
+                    onChange={(e) =>
+                      setFinancial({
+                        ...financial,
+                        goal: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="bg-transparent text-lg font-extrabold text-amber-300 w-32 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-sm">
+                <div className="bg-white/10 p-3 rounded-xl">
+                  <p className="text-xs text-blue-200">Total Vendido</p>
+                  <p className="text-lg font-bold mt-0.5">
+                    +${totalSold.toFixed(2)}
+                  </p>
+                </div>
+
+                <div className="bg-white/10 p-3 rounded-xl">
+                  <p className="text-xs text-blue-200">(-) Deudas Pendientes</p>
+                  <p className="text-lg font-bold text-red-300 mt-0.5">
+                    -${totalPendingDebtsAndSalaries.toFixed(2)}
+                  </p>
+                </div>
+
+                <div className="bg-white/10 p-3 rounded-xl">
+                  <p className="text-xs text-blue-200">(-) Reinversión</p>
+                  <p className="text-lg font-bold text-amber-200 mt-0.5">
+                    -${totalReinvestments.toFixed(2)}
+                  </p>
+                </div>
+
+                <div className="bg-white/10 p-3 rounded-xl">
+                  <p className="text-xs text-blue-200">(-) Pagos Realizados</p>
+                  <p className="text-lg font-bold text-orange-200 mt-0.5">
+                    -${totalPaymentsMade.toFixed(2)}
+                  </p>
+                </div>
+
+                <div className="bg-white text-slate-900 p-3 rounded-xl shadow">
+                  <p className="text-xs font-bold uppercase text-slate-500">
+                    Resultado Neto Meta
+                  </p>
+                  <p
+                    className={`text-xl font-extrabold mt-0.5 ${
+                      netTowardGoal >= 0 ? "text-emerald-700" : "text-red-600"
+                    }`}
+                  >
+                    ${netTowardGoal.toFixed(2)}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Falta para meta: ${remainingForGoal.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-blue-100">
+                  <span>Progreso hacia ${goalTarget.toFixed(2)}</span>
+                  <span>{goalProgressPct.toFixed(1)}%</span>
+                </div>
+                <div className="w-full h-2.5 bg-blue-950 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-amber-400 transition-all"
+                    style={{ width: `${goalProgressPct}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Indicadores de Efectivo y Reinversión */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-2xl border border-slate-200">
                 <p className="text-xs font-bold uppercase text-slate-500">
-                  Total Vendido
+                  Ingresos en Efectivo
                 </p>
-                <p className="mt-1 text-2xl font-extrabold text-green-700">
-                  ${totalSold.toFixed(2)}
+                <p className="mt-1 text-2xl font-extrabold text-slate-900">
+                  ${totalCashSales.toFixed(2)}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Transferencia/Tarjeta: ${totalDigitalSales.toFixed(2)}
                 </p>
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-slate-200">
                 <p className="text-xs font-bold uppercase text-slate-500">
-                  Efectivo Disponible para Pagar
+                  (-) Reinversión Restada de Efectivo
+                </p>
+                <p className="mt-1 text-2xl font-extrabold text-amber-700">
+                  -${totalReinvestments.toFixed(2)}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Se descuenta directo del efectivo ingresado
+                </p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200">
+                <p className="text-xs font-bold uppercase text-slate-500">
+                  Efectivo Neto en Caja
                 </p>
                 <p
                   className={`mt-1 text-2xl font-extrabold ${
-                    availableCash > 0 ? "text-emerald-700" : "text-slate-600"
+                    netCashInDrawer >= 0 ? "text-emerald-700" : "text-red-600"
+                  }`}
+                >
+                  ${netCashInDrawer.toFixed(2)}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Efectivo ingresado − reinversión − pagos
+                </p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200">
+                <p className="text-xs font-bold uppercase text-slate-500">
+                  Saldo Total Disponible
+                </p>
+                <p
+                  className={`mt-1 text-2xl font-extrabold ${
+                    availableCash > 0 ? "text-blue-800" : "text-slate-600"
                   }`}
                 >
                   ${availableCash.toFixed(2)}
@@ -1653,32 +1878,7 @@ export default function NegocioElCheleApp() {
                 <p className="text-[11px] text-slate-500 mt-1">
                   {availableCash > 0
                     ? "Hay dinero disponible para cubrir pagos"
-                    : "Aún no hay saldo disponible de ventas"}
-                </p>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-slate-200">
-                <p className="text-xs font-bold uppercase text-slate-500">
-                  Pendiente por Pagar
-                </p>
-                <p className="mt-1 text-2xl font-extrabold text-red-600">
-                  ${totalPendingObligations.toFixed(2)}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Salarios: ${pendingEmployeePay.toFixed(2)} | Deudas: $
-                  {pendingOtherDebts.toFixed(2)}
-                </p>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-slate-200">
-                <p className="text-xs font-bold uppercase text-slate-500">
-                  Reinversión Registrada
-                </p>
-                <p className="mt-1 text-2xl font-extrabold text-blue-800">
-                  ${totalReinvestments.toFixed(2)}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Meta: ${Number(financial.goal || 0).toFixed(2)}
+                    : "Sin saldo positivo disponible aún"}
                 </p>
               </div>
             </div>
@@ -1768,7 +1968,6 @@ export default function NegocioElCheleApp() {
                 ))}
               </div>
 
-              {/* Agregar nueva fecha de pago para Kat o Gab */}
               <form
                 onSubmit={handleAddEmployeePayDate}
                 className="flex flex-wrap gap-3 items-end bg-slate-50 p-3.5 rounded-xl border border-slate-200"
@@ -1838,7 +2037,6 @@ export default function NegocioElCheleApp() {
 
             {/* Deudas y Reinversiones */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Deudas */}
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
                 <h3 className="font-bold text-slate-900">
                   Deudas y Compromisos
@@ -1882,7 +2080,9 @@ export default function NegocioElCheleApp() {
                 <div className="space-y-2 max-h-72 overflow-y-auto">
                   {financial.otherDebts.map((debt) => {
                     const canPayDebt =
-                      !debt.paid && availableCash >= debt.amount && debt.amount > 0;
+                      !debt.paid &&
+                      availableCash >= debt.amount &&
+                      debt.amount > 0;
                     return (
                       <div
                         key={debt.id}
@@ -1923,11 +2123,16 @@ export default function NegocioElCheleApp() {
                 </div>
               </div>
 
-              {/* Reinversiones */}
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-                <h3 className="font-bold text-slate-900">
-                  Registro de Reinversiones
-                </h3>
+                <div>
+                  <h3 className="font-bold text-slate-900">
+                    Registro de Reinversiones
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Cada reinversión se resta automáticamente del efectivo
+                    ingresado y de la meta general.
+                  </p>
+                </div>
 
                 <form
                   onSubmit={handleAddReinvestment}
@@ -1993,8 +2198,8 @@ export default function NegocioElCheleApp() {
                             {reinv.category} · Fecha: {reinv.date}
                           </p>
                         </div>
-                        <span className="font-extrabold text-blue-800">
-                          ${Number(reinv.amount).toFixed(2)}
+                        <span className="font-extrabold text-amber-700">
+                          -${Number(reinv.amount).toFixed(2)}
                         </span>
                       </div>
                     ))
