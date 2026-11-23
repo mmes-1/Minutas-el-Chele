@@ -24,6 +24,7 @@ import {
   Target,
   Pencil,
   X,
+  Layers,
 } from "lucide-react";
 
 const OWNER_PASSWORD = "Negocio2026";
@@ -37,6 +38,7 @@ const INITIAL_MENU = [
     stock: 400,
     description:
       "Minuta de limon, sal, chile, chamoy, salsa negra, tajin, alguashte, nachos, mango o pepino, chimol, camarones",
+    recipe: [],
   },
   {
     id: 2,
@@ -46,6 +48,7 @@ const INITIAL_MENU = [
     stock: 400,
     description:
       "Minuta de limon, sal, chile, chamoy, salsa negra, tajin, alguashte, nachos, mango o pepino",
+    recipe: [],
   },
   {
     id: 3,
@@ -55,6 +58,7 @@ const INITIAL_MENU = [
     stock: 400,
     description:
       "Minuta de Jarabes de tu elección, leche condensada, gomitas y pixie",
+    recipe: [],
   },
   {
     id: 4,
@@ -64,6 +68,7 @@ const INITIAL_MENU = [
     stock: 400,
     description:
       "Minuta de Jarabes de tu elección con fruta picada (guineo y piña) y jalea de tamarindo o leche condensada",
+    recipe: [],
   },
   {
     id: 5,
@@ -73,6 +78,7 @@ const INITIAL_MENU = [
     stock: 400,
     description:
       "Minuta de limon, sal, chile, chamoy, salsa negra, tajin, alguashte",
+    recipe: [],
   },
   {
     id: 6,
@@ -81,6 +87,7 @@ const INITIAL_MENU = [
     price: 2.0,
     stock: 600,
     description: "Licuado de guineo preparado con leche",
+    recipe: [],
   },
   {
     id: 7,
@@ -89,6 +96,7 @@ const INITIAL_MENU = [
     price: 2.0,
     stock: 600,
     description: "Licuado de fresa preparado con leche",
+    recipe: [],
   },
   {
     id: 8,
@@ -97,6 +105,7 @@ const INITIAL_MENU = [
     price: 2.0,
     stock: 600,
     description: "Licuado de galleta Oreo preparado con leche",
+    recipe: [],
   },
 ];
 
@@ -248,13 +257,31 @@ function syncProductsWithSharedSupplies(prodList, supList) {
   const licuadoCupSup = supList.find((s) => s.id === "s1");
 
   return prodList.map((p) => {
+    const recipe = Array.isArray(p.recipe) ? p.recipe : [];
+    if (recipe.length > 0) {
+      let maxByRecipe = Infinity;
+      for (const r of recipe) {
+        const sup = supList.find((s) => s.id === r.supplyId);
+        const qtyPerUnit = parseFloat(r.qty) || 0;
+        if (sup && qtyPerUnit > 0) {
+          maxByRecipe = Math.min(
+            maxByRecipe,
+            Math.floor(sup.stock / qtyPerUnit)
+          );
+        }
+      }
+      if (Number.isFinite(maxByRecipe)) {
+        return { ...p, recipe, stock: Math.max(0, maxByRecipe) };
+      }
+    }
+
     if (p.category === "Minutas" && traySup) {
-      return { ...p, stock: traySup.stock };
+      return { ...p, recipe, stock: traySup.stock };
     }
     if (p.category === "Licuados" && licuadoCupSup) {
-      return { ...p, stock: licuadoCupSup.stock };
+      return { ...p, recipe, stock: licuadoCupSup.stock };
     }
-    return p;
+    return { ...p, recipe };
   });
 }
 
@@ -269,6 +296,60 @@ function applySupplyNetChanges(supList, netMinutasDelta, netLicuadosDelta) {
 
     if (delta !== 0) {
       return { ...sup, stock: Math.max(0, sup.stock - delta) };
+    }
+    return sup;
+  });
+}
+
+function computeItemsSupplyImpact(itemsList, productsCatalog, sign = 1) {
+  const recipeDeltas = {};
+  let fallbackMinutas = 0;
+  let fallbackLicuados = 0;
+
+  for (const item of itemsList) {
+    const qtySold = parseInt(item.qty, 10) || 0;
+    if (qtySold === 0) continue;
+
+    const catalogProd = productsCatalog.find((p) => p.id === item.id);
+    const recipe = Array.isArray(catalogProd?.recipe)
+      ? catalogProd.recipe
+      : Array.isArray(item.recipe)
+      ? item.recipe
+      : [];
+
+    if (recipe.length > 0) {
+      for (const r of recipe) {
+        const perUnit = parseFloat(r.qty) || 0;
+        if (r.supplyId && perUnit > 0) {
+          recipeDeltas[r.supplyId] =
+            (recipeDeltas[r.supplyId] || 0) + sign * qtySold * perUnit;
+        }
+      }
+    } else {
+      const cat = catalogProd?.category || item.category;
+      if (cat === "Minutas") fallbackMinutas += sign * qtySold;
+      if (cat === "Licuados") fallbackLicuados += sign * qtySold;
+    }
+  }
+
+  return { recipeDeltas, fallbackMinutas, fallbackLicuados };
+}
+
+function applyCombinedSupplyChanges(
+  supList,
+  recipeDeltas,
+  fallbackMinutas,
+  fallbackLicuados
+) {
+  const baseUpdated = applySupplyNetChanges(
+    supList,
+    fallbackMinutas,
+    fallbackLicuados
+  );
+  return baseUpdated.map((sup) => {
+    const extraDelta = recipeDeltas[sup.id] || 0;
+    if (extraDelta !== 0) {
+      return { ...sup, stock: Math.max(0, sup.stock - extraDelta) };
     }
     return sup;
   });
@@ -298,8 +379,20 @@ export default function NegocioElCheleApp() {
   const [salesEditUnlocked, setSalesEditUnlocked] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [pendingAction, setPendingAction] = useState(null); // 'priceAndStock' | 'financial' | 'editSale' | 'deleteSale'
+  const [pendingAction, setPendingAction] = useState(null);
   const [salePendingAction, setSalePendingAction] = useState(null);
+  const [productPendingEdit, setProductPendingEdit] = useState(null);
+
+  // Modal para editar producto del menú y sus insumos vinculados
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [editProdName, setEditProdName] = useState("");
+  const [editProdCategory, setEditProdCategory] = useState("Minutas");
+  const [editProdPrice, setEditProdPrice] = useState("");
+  const [editProdStock, setEditProdStock] = useState("");
+  const [editProdDesc, setEditProdDesc] = useState("");
+  const [editProdRecipe, setEditProdRecipe] = useState([]);
+  const [editSelectedSupplyId, setEditSelectedSupplyId] = useState("");
+  const [editSelectedSupplyQty, setEditSelectedSupplyQty] = useState("1");
 
   // Modal para modificar una venta existente
   const [editingSale, setEditingSale] = useState(null);
@@ -317,11 +410,20 @@ export default function NegocioElCheleApp() {
   const [invUpdateNote, setInvUpdateNote] = useState("");
   const [invDraftInputs, setInvDraftInputs] = useState({});
 
-  // Nuevo producto de menú
+  // Crear nuevo insumo
+  const [newSupplyName, setNewSupplyName] = useState("");
+  const [newSupplyType, setNewSupplyType] = useState("Materia Prima");
+  const [newSupplyStock, setNewSupplyStock] = useState("");
+
+  // Nuevo producto de menú + vinculación de insumos
   const [newProdName, setNewProdName] = useState("");
   const [newProdCategory, setNewProdCategory] = useState("Minutas");
   const [newProdPrice, setNewProdPrice] = useState("");
   const [newProdStock, setNewProdStock] = useState("");
+  const [newProdDesc, setNewProdDesc] = useState("");
+  const [newProdRecipe, setNewProdRecipe] = useState([]);
+  const [newSelectedSupplyId, setNewSelectedSupplyId] = useState("");
+  const [newSelectedSupplyQty, setNewSelectedSupplyQty] = useState("1");
 
   // Nuevos registros financieros
   const [newDebtConcept, setNewDebtConcept] = useState("");
@@ -359,6 +461,11 @@ export default function NegocioElCheleApp() {
     setFinancial(
       savedFinancial ? JSON.parse(savedFinancial) : INITIAL_FINANCIAL
     );
+
+    if (loadedSupplies.length > 0) {
+      setNewSelectedSupplyId((prev) => prev || loadedSupplies[0].id);
+      setEditSelectedSupplyId((prev) => prev || loadedSupplies[0].id);
+    }
   }, []);
 
   useEffect(() => {
@@ -386,11 +493,15 @@ export default function NegocioElCheleApp() {
   }, [financial]);
 
   // --- CONTRASEÑA ---
-  const openPasswordModal = (target, saleObj = null) => {
+  const openPasswordModal = (target, payloadObj = null) => {
     setPasswordInput("");
     setPasswordError("");
     setPendingAction(target);
-    setSalePendingAction(saleObj);
+    if (target === "editProduct") {
+      setProductPendingEdit(payloadObj);
+    } else {
+      setSalePendingAction(payloadObj);
+    }
   };
 
   const openSaleEditorDirectly = (saleObj) => {
@@ -403,6 +514,20 @@ export default function NegocioElCheleApp() {
     setEditSaleTxCode(saleObj.transactionCode || "");
   };
 
+  const openProductEditorDirectly = (prodObj) => {
+    setEditingProduct(prodObj);
+    setEditProdName(prodObj.name || "");
+    setEditProdCategory(prodObj.category || "Minutas");
+    setEditProdPrice(String(prodObj.price ?? ""));
+    setEditProdStock(String(prodObj.stock ?? ""));
+    setEditProdDesc(prodObj.description || "");
+    setEditProdRecipe(Array.isArray(prodObj.recipe) ? [...prodObj.recipe] : []);
+    if (supplies.length > 0) {
+      setEditSelectedSupplyId(supplies[0].id);
+    }
+    setEditSelectedSupplyQty("1");
+  };
+
   const deleteSaleAndRestoreStock = (saleObj) => {
     const confirmed = window.confirm(
       `¿Eliminar la venta del ${saleObj.date} por $${Number(
@@ -411,32 +536,32 @@ export default function NegocioElCheleApp() {
     );
     if (!confirmed) return;
 
-    const minutasSold = saleObj.items
-      .filter((i) => i.category === "Minutas")
-      .reduce((s, i) => s + (parseInt(i.qty, 10) || 0), 0);
+    const { recipeDeltas, fallbackMinutas, fallbackLicuados } =
+      computeItemsSupplyImpact(saleObj.items, products, -1);
 
-    const licuadosSold = saleObj.items
-      .filter((i) => i.category === "Licuados")
-      .reduce((s, i) => s + (parseInt(i.qty, 10) || 0), 0);
-
-    // Restar delta negativo equivale a sumar (devolver) el stock descontado
-    const updatedSupplies = applySupplyNetChanges(
+    const updatedSupplies = applyCombinedSupplyChanges(
       supplies,
-      -minutasSold,
-      -licuadosSold
+      recipeDeltas,
+      fallbackMinutas,
+      fallbackLicuados
     );
     setSupplies(updatedSupplies);
 
     const updatedProducts = syncProductsWithSharedSupplies(
       products.map((prod) => {
-        if (prod.category === "Minutas" || prod.category === "Licuados") {
+        const hasRecipe = Array.isArray(prod.recipe) && prod.recipe.length > 0;
+        if (
+          !hasRecipe &&
+          (prod.category === "Minutas" || prod.category === "Licuados")
+        ) {
           return prod;
         }
         const soldItem = saleObj.items.find((i) => i.id === prod.id);
         const qtyToRestore = parseInt(soldItem?.qty, 10) || 0;
-        return qtyToRestore > 0
-          ? { ...prod, stock: prod.stock + qtyToRestore }
-          : prod;
+        if (qtyToRestore > 0 && !hasRecipe) {
+          return { ...prod, stock: prod.stock + qtyToRestore };
+        }
+        return prod;
       }),
       updatedSupplies
     );
@@ -450,6 +575,11 @@ export default function NegocioElCheleApp() {
     if (passwordInput === OWNER_PASSWORD) {
       if (pendingAction === "priceAndStock") {
         setPriceAndStockUnlocked(true);
+      } else if (pendingAction === "editProduct") {
+        setPriceAndStockUnlocked(true);
+        if (productPendingEdit) {
+          openProductEditorDirectly(productPendingEdit);
+        }
       } else if (pendingAction === "financial") {
         setFinancialUnlocked(true);
         setActiveTab("financial");
@@ -472,11 +602,140 @@ export default function NegocioElCheleApp() {
       }
       setPendingAction(null);
       setSalePendingAction(null);
+      setProductPendingEdit(null);
       setPasswordInput("");
       setPasswordError("");
     } else {
       setPasswordError("Contraseña incorrecta. Ingresa Negocio2026.");
     }
+  };
+
+  // --- CREAR Y ELIMINAR INSUMOS ---
+  const handleAddSupply = (e) => {
+    e.preventDefault();
+    if (!newSupplyName.trim()) return;
+    if (!priceAndStockUnlocked) {
+      openPasswordModal("priceAndStock");
+      return;
+    }
+
+    const parsedStock = parseFloat(newSupplyStock);
+    const createdSupply = {
+      id: `sup-${Date.now()}`,
+      name: newSupplyName.trim(),
+      type: newSupplyType,
+      stock: Number.isNaN(parsedStock) ? 0 : Math.max(0, parsedStock),
+    };
+
+    const nextSupplies = [...supplies, createdSupply];
+    setSupplies(nextSupplies);
+    setProducts(syncProductsWithSharedSupplies(products, nextSupplies));
+
+    if (!newSelectedSupplyId) setNewSelectedSupplyId(createdSupply.id);
+    if (!editSelectedSupplyId) setEditSelectedSupplyId(createdSupply.id);
+
+    setNewSupplyName("");
+    setNewSupplyStock("");
+  };
+
+  const handleDeleteSupply = (supObj) => {
+    if (!priceAndStockUnlocked) {
+      openPasswordModal("priceAndStock");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `¿Eliminar el insumo "${supObj.name}" del inventario? También se quitará de las recetas de productos.`
+    );
+    if (!confirmed) return;
+
+    const nextSupplies = supplies.filter((s) => s.id !== supObj.id);
+    const nextProducts = products.map((p) => ({
+      ...p,
+      recipe: Array.isArray(p.recipe)
+        ? p.recipe.filter((r) => r.supplyId !== supObj.id)
+        : [],
+    }));
+
+    setSupplies(nextSupplies);
+    setProducts(syncProductsWithSharedSupplies(nextProducts, nextSupplies));
+
+    if (newSelectedSupplyId === supObj.id) {
+      setNewSelectedSupplyId(nextSupplies[0]?.id || "");
+    }
+    if (editSelectedSupplyId === supObj.id) {
+      setEditSelectedSupplyId(nextSupplies[0]?.id || "");
+    }
+  };
+
+  // --- EDITAR PRODUCTO Y SUS INSUMOS VINCULADOS ---
+  const handleRequestEditProduct = (prodObj) => {
+    if (!priceAndStockUnlocked) {
+      openPasswordModal("editProduct", prodObj);
+      return;
+    }
+    openProductEditorDirectly(prodObj);
+  };
+
+  const addSupplyToRecipe = (recipeList, setRecipeList, supplyId, qtyRaw) => {
+    const qty = parseFloat(qtyRaw);
+    if (!supplyId || Number.isNaN(qty) || qty <= 0) return;
+
+    const exists = recipeList.find((r) => r.supplyId === supplyId);
+    if (exists) {
+      setRecipeList(
+        recipeList.map((r) =>
+          r.supplyId === supplyId
+            ? { ...r, qty: (parseFloat(r.qty) || 0) + qty }
+            : r
+        )
+      );
+    } else {
+      setRecipeList([...recipeList, { supplyId, qty }]);
+    }
+  };
+
+  const updateRecipeItemQty = (recipeList, setRecipeList, supplyId, qtyRaw) => {
+    const qty = parseFloat(qtyRaw);
+    setRecipeList(
+      recipeList.map((r) =>
+        r.supplyId === supplyId
+          ? { ...r, qty: Number.isNaN(qty) ? 0 : Math.max(0, qty) }
+          : r
+      )
+    );
+  };
+
+  const removeSupplyFromRecipe = (recipeList, setRecipeList, supplyId) => {
+    setRecipeList(recipeList.filter((r) => r.supplyId !== supplyId));
+  };
+
+  const handleSaveEditedProduct = (e) => {
+    e.preventDefault();
+    if (!editingProduct || !editProdName.trim()) return;
+
+    const cleanRecipe = editProdRecipe
+      .map((r) => ({ supplyId: r.supplyId, qty: parseFloat(r.qty) || 0 }))
+      .filter((r) => r.supplyId && r.qty > 0);
+
+    const parsedPrice = parseFloat(editProdPrice);
+    const parsedStock = parseInt(editProdStock, 10);
+
+    const updatedList = products.map((p) => {
+      if (p.id !== editingProduct.id) return p;
+      return {
+        ...p,
+        name: editProdName.trim(),
+        category: editProdCategory,
+        price: Number.isNaN(parsedPrice) ? p.price : parsedPrice,
+        stock: Number.isNaN(parsedStock) ? p.stock : Math.max(0, parsedStock),
+        description: editProdDesc.trim(),
+        recipe: cleanRecipe,
+      };
+    });
+
+    setProducts(syncProductsWithSharedSupplies(updatedList, supplies));
+    setEditingProduct(null);
   };
 
   // --- MODIFICAR / ELIMINAR VENTA EXISTENTE ---
@@ -504,7 +763,8 @@ export default function NegocioElCheleApp() {
   };
 
   const editedSaleTotal = editSaleItems.reduce(
-    (sum, it) => sum + (parseFloat(it.price) || 0) * (parseInt(it.qty, 10) || 0),
+    (sum, it) =>
+      sum + (parseFloat(it.price) || 0) * (parseInt(it.qty, 10) || 0),
     0
   );
   const editedCashNum = parseFloat(editSaleCashGiven);
@@ -534,36 +794,41 @@ export default function NegocioElCheleApp() {
       return;
     }
 
-    const oldMinutas = editingSale.items
-      .filter((i) => i.category === "Minutas")
-      .reduce((s, i) => s + i.qty, 0);
-    const newMinutas = cleanedItems
-      .filter((i) => i.category === "Minutas")
-      .reduce((s, i) => s + i.qty, 0);
+    const oldImpact = computeItemsSupplyImpact(editingSale.items, products, 1);
+    const newImpact = computeItemsSupplyImpact(cleanedItems, products, 1);
 
-    const oldLicuados = editingSale.items
-      .filter((i) => i.category === "Licuados")
-      .reduce((s, i) => s + i.qty, 0);
-    const newLicuados = cleanedItems
-      .filter((i) => i.category === "Licuados")
-      .reduce((s, i) => s + i.qty, 0);
+    const netRecipeDeltas = {};
+    const allSupplyIds = new Set([
+      ...Object.keys(oldImpact.recipeDeltas),
+      ...Object.keys(newImpact.recipeDeltas),
+    ]);
+    for (const supId of allSupplyIds) {
+      netRecipeDeltas[supId] =
+        (newImpact.recipeDeltas[supId] || 0) -
+        (oldImpact.recipeDeltas[supId] || 0);
+    }
 
-    const updatedSupplies = applySupplyNetChanges(
+    const updatedSupplies = applyCombinedSupplyChanges(
       supplies,
-      newMinutas - oldMinutas,
-      newLicuados - oldLicuados
+      netRecipeDeltas,
+      newImpact.fallbackMinutas - oldImpact.fallbackMinutas,
+      newImpact.fallbackLicuados - oldImpact.fallbackLicuados
     );
     setSupplies(updatedSupplies);
 
     const updatedProducts = syncProductsWithSharedSupplies(
       products.map((prod) => {
-        if (prod.category === "Minutas" || prod.category === "Licuados") {
+        const hasRecipe = Array.isArray(prod.recipe) && prod.recipe.length > 0;
+        if (
+          !hasRecipe &&
+          (prod.category === "Minutas" || prod.category === "Licuados")
+        ) {
           return prod;
         }
         const prevItem = editingSale.items.find((i) => i.id === prod.id);
         const nextItem = cleanedItems.find((i) => i.id === prod.id);
         const diff = (nextItem?.qty || 0) - (prevItem?.qty || 0);
-        return diff !== 0
+        return diff !== 0 && !hasRecipe
           ? { ...prod, stock: Math.max(0, prod.stock - diff) }
           : prod;
       }),
@@ -682,12 +947,16 @@ export default function NegocioElCheleApp() {
   const addToCart = (product) => {
     if (product.stock <= 0) return;
 
+    const hasRecipe = Array.isArray(product.recipe) && product.recipe.length > 0;
     const sameCategoryCartQty = cart
       .filter((item) => item.category === product.category)
       .reduce((sum, item) => sum + item.qty, 0);
 
     const existing = cart.find((item) => item.id === product.id);
-    if (sameCategoryCartQty >= product.stock) return;
+    const currentItemQty = existing ? existing.qty : 0;
+
+    if (hasRecipe && currentItemQty >= product.stock) return;
+    if (!hasRecipe && sameCategoryCartQty >= product.stock) return;
 
     if (existing) {
       setCart(
@@ -702,6 +971,7 @@ export default function NegocioElCheleApp() {
 
   const updateCartQty = (id, delta) => {
     const prod = products.find((p) => p.id === id);
+    const hasRecipe = Array.isArray(prod?.recipe) && prod.recipe.length > 0;
     const sameCategoryCartQty = prod
       ? cart
           .filter((item) => item.category === prod.category)
@@ -717,6 +987,7 @@ export default function NegocioElCheleApp() {
             if (
               delta > 0 &&
               prod &&
+              !hasRecipe &&
               (prod.category === "Minutas" || prod.category === "Licuados") &&
               sameCategoryCartQty >= prod.stock
             ) {
@@ -748,28 +1019,28 @@ export default function NegocioElCheleApp() {
       return;
     }
 
-    const minutasSold = cart
-      .filter((c) => c.category === "Minutas")
-      .reduce((sum, c) => sum + c.qty, 0);
+    const { recipeDeltas, fallbackMinutas, fallbackLicuados } =
+      computeItemsSupplyImpact(cart, products, 1);
 
-    const licuadosSold = cart
-      .filter((c) => c.category === "Licuados")
-      .reduce((sum, c) => sum + c.qty, 0);
-
-    const updatedSupplies = applySupplyNetChanges(
+    const updatedSupplies = applyCombinedSupplyChanges(
       supplies,
-      minutasSold,
-      licuadosSold
+      recipeDeltas,
+      fallbackMinutas,
+      fallbackLicuados
     );
     setSupplies(updatedSupplies);
 
     const updatedProducts = syncProductsWithSharedSupplies(
       products.map((prod) => {
-        if (prod.category === "Minutas" || prod.category === "Licuados") {
+        const hasRecipe = Array.isArray(prod.recipe) && prod.recipe.length > 0;
+        if (
+          !hasRecipe &&
+          (prod.category === "Minutas" || prod.category === "Licuados")
+        ) {
           return prod;
         }
         const sold = cart.find((c) => c.id === prod.id);
-        if (sold) {
+        if (sold && !hasRecipe) {
           return { ...prod, stock: Math.max(0, prod.stock - sold.qty) };
         }
         return prod;
@@ -829,13 +1100,16 @@ export default function NegocioElCheleApp() {
 
     if (!targetProd) return;
 
-    if (targetProd.category === "Minutas") {
+    const hasRecipe =
+      Array.isArray(targetProd.recipe) && targetProd.recipe.length > 0;
+
+    if (!hasRecipe && targetProd.category === "Minutas") {
       const nextSupplies = supplies.map((s) =>
         s.id === "s3" ? { ...s, stock: cleanVal } : s
       );
       setSupplies(nextSupplies);
       setProducts(syncProductsWithSharedSupplies(products, nextSupplies));
-    } else if (targetProd.category === "Licuados") {
+    } else if (!hasRecipe && targetProd.category === "Licuados") {
       const nextSupplies = supplies.map((s) =>
         s.id === "s1" ? { ...s, stock: cleanVal } : s
       );
@@ -855,35 +1129,45 @@ export default function NegocioElCheleApp() {
     if (!newProdName.trim()) return;
     const priceVal = parseFloat(newProdPrice) || 0;
 
-    if (!priceAndStockUnlocked && (priceVal > 0 || newProdStock !== "")) {
+    if (
+      !priceAndStockUnlocked &&
+      (priceVal > 0 || newProdStock !== "" || newProdRecipe.length > 0)
+    ) {
       openPasswordModal("priceAndStock");
       return;
     }
+
+    const cleanRecipe = newProdRecipe
+      .map((r) => ({ supplyId: r.supplyId, qty: parseFloat(r.qty) || 0 }))
+      .filter((r) => r.supplyId && r.qty > 0);
 
     const trayStock = supplies.find((s) => s.id === "s3")?.stock ?? 400;
     const cupStock = supplies.find((s) => s.id === "s1")?.stock ?? 600;
 
     const initialStock =
-      newProdCategory === "Minutas"
+      newProdStock !== ""
+        ? Math.max(0, parseInt(newProdStock, 10) || 0)
+        : newProdCategory === "Minutas"
         ? trayStock
-        : newProdCategory === "Licuados"
-        ? cupStock
-        : parseInt(newProdStock, 10) || 0;
+        : cupStock;
 
-    setProducts([
-      ...products,
-      {
-        id: Date.now(),
-        name: newProdName.trim(),
-        category: newProdCategory,
-        price: priceVal,
-        stock: initialStock,
-        description: "",
-      },
-    ]);
+    const created = {
+      id: Date.now(),
+      name: newProdName.trim(),
+      category: newProdCategory,
+      price: priceVal,
+      stock: initialStock,
+      description: newProdDesc.trim(),
+      recipe: cleanRecipe,
+    };
+
+    setProducts(syncProductsWithSharedSupplies([...products, created], supplies));
     setNewProdName("");
     setNewProdPrice("");
     setNewProdStock("");
+    setNewProdDesc("");
+    setNewProdRecipe([]);
+    setNewSelectedSupplyQty("1");
   };
 
   // --- FINANCIERO ---
@@ -1006,6 +1290,13 @@ export default function NegocioElCheleApp() {
           Categoria: p.category,
           Precio: p.price,
           Stock: p.stock,
+          Insumos_Vinculados: (p.recipe || [])
+            .map((r) => {
+              const sName =
+                supplies.find((s) => s.id === r.supplyId)?.name || r.supplyId;
+              return `${r.qty}x ${sName}`;
+            })
+            .join(", "),
         }))
       ),
       "Menu"
@@ -1127,6 +1418,9 @@ export default function NegocioElCheleApp() {
     return matchesSearch && matchesCat;
   });
 
+  const getSupplyName = (id) =>
+    supplies.find((s) => s.id === id)?.name || id;
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 text-slate-800">
       {/* MODAL DE CONTRASEÑA */}
@@ -1145,7 +1439,7 @@ export default function NegocioElCheleApp() {
                   ? "Desbloquear Eliminación de Ventas"
                   : pendingAction === "editSale"
                   ? "Desbloquear Edición de Ventas"
-                  : "Desbloquear Precio y Stock Inicial"}
+                  : "Desbloquear Edición de Menú y Stock"}
               </span>
             </div>
             <p className="text-sm text-slate-600">
@@ -1155,7 +1449,7 @@ export default function NegocioElCheleApp() {
                 ? "Ingresa la contraseña del dueño para eliminar ventas y devolver su stock."
                 : pendingAction === "editSale"
                 ? "Ingresa la contraseña del dueño para modificar ventas registradas."
-                : "Ingresa la contraseña del dueño para modificar precios o colocar el stock inicial del menú."}
+                : "Ingresa la contraseña del dueño para modificar productos, insumos, precios o stock."}
             </p>
             <input
               type="password"
@@ -1176,6 +1470,7 @@ export default function NegocioElCheleApp() {
                 onClick={() => {
                   setPendingAction(null);
                   setSalePendingAction(null);
+                  setProductPendingEdit(null);
                 }}
                 className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-medium hover:bg-slate-50"
               >
@@ -1186,6 +1481,227 @@ export default function NegocioElCheleApp() {
                 className="px-4 py-2 rounded-xl bg-blue-800 text-white text-sm font-semibold hover:bg-blue-900"
               >
                 Entrar
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL PARA EDITAR PRODUCTO Y SUS INSUMOS VINCULADOS */}
+      {editingProduct && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSaveEditedProduct}
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Editar Producto e Insumos Vinculados
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Define qué insumos ocupa por cada 1 unidad vendida de este
+                  producto.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingProduct(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                  Nombre del producto
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editProdName}
+                  onChange={(e) => setEditProdName(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                  Categoría
+                </label>
+                <select
+                  value={editProdCategory}
+                  onChange={(e) => setEditProdCategory(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm font-semibold"
+                >
+                  <option value="Minutas">Minutas</option>
+                  <option value="Licuados">Licuados</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                  Precio ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={editProdPrice}
+                  onChange={(e) => setEditProdPrice(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                  Stock / Disponibilidad
+                </label>
+                <input
+                  type="number"
+                  value={editProdStock}
+                  onChange={(e) => setEditProdStock(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm font-bold"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                Descripción (opcional)
+              </label>
+              <input
+                type="text"
+                value={editProdDesc}
+                onChange={(e) => setEditProdDesc(e.target.value)}
+                placeholder="Ingredientes o detalle del producto"
+                className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm"
+              />
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase text-slate-700 flex items-center gap-1.5">
+                  <Layers size={15} className="text-blue-700" /> Insumos que
+                  ocupa este producto (por unidad)
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="flex-1 min-w-[180px]">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Insumo
+                  </label>
+                  <select
+                    value={editSelectedSupplyId}
+                    onChange={(e) => setEditSelectedSupplyId(e.target.value)}
+                    className="w-full p-2 border rounded-lg bg-white text-sm"
+                  >
+                    {supplies.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} (Disp: {s.stock})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-28">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Cantidad / ud
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0.01"
+                    value={editSelectedSupplyQty}
+                    onChange={(e) => setEditSelectedSupplyQty(e.target.value)}
+                    className="w-full p-2 border rounded-lg bg-white text-sm font-semibold"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    addSupplyToRecipe(
+                      editProdRecipe,
+                      setEditProdRecipe,
+                      editSelectedSupplyId,
+                      editSelectedSupplyQty
+                    )
+                  }
+                  className="bg-blue-700 hover:bg-blue-800 text-white px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1"
+                >
+                  <Plus size={15} /> Vincular Insumo
+                </button>
+              </div>
+
+              {editProdRecipe.length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  Sin insumos personalizados: al vender descontará la regla base
+                  de categoría (bandeja/vaso y pajilla).
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {editProdRecipe.map((r) => (
+                    <div
+                      key={r.supplyId}
+                      className="flex justify-between items-center gap-2 bg-white p-2.5 rounded-lg border border-slate-200 text-sm"
+                    >
+                      <span className="font-semibold text-slate-800">
+                        {getSupplyName(r.supplyId)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500">Ocupa:</span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={r.qty}
+                          onChange={(e) =>
+                            updateRecipeItemQty(
+                              editProdRecipe,
+                              setEditProdRecipe,
+                              r.supplyId,
+                              e.target.value
+                            )
+                          }
+                          className="w-20 p-1 border border-slate-300 rounded text-right text-xs font-bold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeSupplyFromRecipe(
+                              editProdRecipe,
+                              setEditProdRecipe,
+                              r.supplyId
+                            )
+                          }
+                          className="text-red-600 hover:bg-red-50 p-1 rounded"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingProduct(null)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-medium hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-blue-800 hover:bg-blue-900 text-white text-sm font-bold"
+              >
+                Guardar Producto
               </button>
             </div>
           </form>
@@ -1790,10 +2306,8 @@ export default function NegocioElCheleApp() {
                   Inventario Diario y Control de Stock
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Las minutas comparten el stock de bandejas (<strong>400</strong>
-                  ) y los licuados comparten el stock general de vasos (
-                  <strong>600</strong>). Al vender, se descuentan
-                  automáticamente las bandejas/vasos y pajillas.
+                  Puedes vincular qué insumos ocupa cada producto: al venderlo,
+                  se descontarán esos insumos del inventario.
                 </p>
               </div>
 
@@ -1842,72 +2356,161 @@ export default function NegocioElCheleApp() {
             {/* Productos del Menú */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
               <h3 className="font-bold text-slate-800">
-                Productos del Menú (Precio y Stock Inicial protegidos con
+                Productos del Menú e Insumos Vinculados (Protegido con
                 Negocio2026)
               </h3>
 
               <form
                 onSubmit={handleAddProduct}
-                className="flex flex-wrap gap-3 items-end bg-slate-50 p-3.5 rounded-xl border border-slate-200"
+                className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3"
               >
-                <div className="flex-1 min-w-[180px]">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Nombre
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newProdName}
-                    onChange={(e) => setNewProdName(e.target.value)}
-                    placeholder="Nombre del producto"
-                    className="w-full p-2 border rounded-lg bg-white text-sm"
-                  />
+                <div className="flex flex-wrap gap-3 items-end">
+                  <div className="flex-1 min-w-[180px]">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Nombre
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newProdName}
+                      onChange={(e) => setNewProdName(e.target.value)}
+                      placeholder="Nombre del producto"
+                      className="w-full p-2 border rounded-lg bg-white text-sm"
+                    />
+                  </div>
+                  <div className="w-36">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Categoría
+                    </label>
+                    <select
+                      value={newProdCategory}
+                      onChange={(e) => setNewProdCategory(e.target.value)}
+                      className="w-full p-2 border rounded-lg bg-white text-sm"
+                    >
+                      <option value="Minutas">Minutas</option>
+                      <option value="Licuados">Licuados</option>
+                    </select>
+                  </div>
+                  <div className="w-28">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Precio ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={newProdPrice}
+                      onChange={(e) => setNewProdPrice(e.target.value)}
+                      placeholder="2.00"
+                      className="w-full p-2 border rounded-lg bg-white text-sm"
+                    />
+                  </div>
+                  <div className="w-32">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Stock Inicial
+                    </label>
+                    <input
+                      type="number"
+                      value={newProdStock}
+                      onChange={(e) => setNewProdStock(e.target.value)}
+                      placeholder={newProdCategory === "Minutas" ? "400" : "600"}
+                      className="w-full p-2 border rounded-lg bg-white text-sm"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[160px]">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Descripción
+                    </label>
+                    <input
+                      type="text"
+                      value={newProdDesc}
+                      onChange={(e) => setNewProdDesc(e.target.value)}
+                      placeholder="Detalle opcional"
+                      className="w-full p-2 border rounded-lg bg-white text-sm"
+                    />
+                  </div>
                 </div>
-                <div className="w-36">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Categoría
+
+                <div className="pt-2 border-t border-slate-200 space-y-2">
+                  <label className="block text-xs font-bold uppercase text-slate-600">
+                    ¿Qué insumos ocupa este producto? (se restarán al vender)
                   </label>
-                  <select
-                    value={newProdCategory}
-                    onChange={(e) => setNewProdCategory(e.target.value)}
-                    className="w-full p-2 border rounded-lg bg-white text-sm"
+                  <div className="flex flex-wrap gap-2 items-end">
+                    <div className="flex-1 min-w-[200px]">
+                      <select
+                        value={newSelectedSupplyId}
+                        onChange={(e) => setNewSelectedSupplyId(e.target.value)}
+                        className="w-full p-2 border rounded-lg bg-white text-sm"
+                      >
+                        {supplies.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} (Disp: {s.stock})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-28">
+                      <input
+                        type="number"
+                        step="any"
+                        min="0.01"
+                        value={newSelectedSupplyQty}
+                        onChange={(e) => setNewSelectedSupplyQty(e.target.value)}
+                        placeholder="Cant."
+                        className="w-full p-2 border rounded-lg bg-white text-sm"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        addSupplyToRecipe(
+                          newProdRecipe,
+                          setNewProdRecipe,
+                          newSelectedSupplyId,
+                          newSelectedSupplyQty
+                        )
+                      }
+                      className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1"
+                    >
+                      <Plus size={14} /> Agregar Insumo
+                    </button>
+                  </div>
+
+                  {newProdRecipe.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {newProdRecipe.map((r) => (
+                        <span
+                          key={r.supplyId}
+                          className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-900 text-xs font-semibold px-2.5 py-1 rounded-lg"
+                        >
+                          {r.qty}x {getSupplyName(r.supplyId)}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeSupplyFromRecipe(
+                                newProdRecipe,
+                                setNewProdRecipe,
+                                r.supplyId
+                              )
+                            }
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <X size={13} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="submit"
+                    className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1"
                   >
-                    <option value="Minutas">Minutas</option>
-                    <option value="Licuados">Licuados</option>
-                  </select>
+                    <Plus size={16} /> Agregar Producto al Menú
+                  </button>
                 </div>
-                <div className="w-28">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Precio ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={newProdPrice}
-                    onChange={(e) => setNewProdPrice(e.target.value)}
-                    placeholder="2.00"
-                    className="w-full p-2 border rounded-lg bg-white text-sm"
-                  />
-                </div>
-                <div className="w-32">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Stock Inicial
-                  </label>
-                  <input
-                    type="number"
-                    value={newProdStock}
-                    onChange={(e) => setNewProdStock(e.target.value)}
-                    placeholder={newProdCategory === "Minutas" ? "400" : "600"}
-                    className="w-full p-2 border rounded-lg bg-white text-sm"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1"
-                >
-                  <Plus size={16} /> Agregar
-                </button>
               </form>
 
               <div className="overflow-x-auto">
@@ -1915,17 +2518,42 @@ export default function NegocioElCheleApp() {
                   <thead className="bg-slate-50 border-b text-xs uppercase text-slate-500">
                     <tr>
                       <th className="p-3">Producto</th>
-                      <th className="p-3">Categoría</th>
+                      <th className="p-3">Insumos Vinculados</th>
                       <th className="p-3">Precio ($)</th>
-                      <th className="p-3">Stock Compartido / Disp.</th>
-                      <th className="p-3 text-right">Eliminar</th>
+                      <th className="p-3">Stock / Disp.</th>
+                      <th className="p-3 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {products.map((prod) => (
                       <tr key={prod.id} className="hover:bg-slate-50">
-                        <td className="p-3 font-semibold">{prod.name}</td>
-                        <td className="p-3 text-slate-600">{prod.category}</td>
+                        <td className="p-3">
+                          <p className="font-semibold text-slate-900">
+                            {prod.name}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {prod.category}
+                          </p>
+                        </td>
+                        <td className="p-3">
+                          {Array.isArray(prod.recipe) &&
+                          prod.recipe.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {prod.recipe.map((r) => (
+                                <span
+                                  key={r.supplyId}
+                                  className="text-xs bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md font-medium"
+                                >
+                                  {r.qty}x {getSupplyName(r.supplyId)}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">
+                              Base por categoría
+                            </span>
+                          )}
+                        </td>
                         <td className="p-3">
                           <div className="flex items-center gap-1.5">
                             <span className="text-slate-400">$</span>
@@ -1982,17 +2610,28 @@ export default function NegocioElCheleApp() {
                             )}
                           </div>
                         </td>
-                        <td className="p-3 text-right">
-                          <button
-                            onClick={() =>
-                              setProducts(
-                                products.filter((p) => p.id !== prod.id)
-                              )
-                            }
-                            className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleRequestEditProduct(prod)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                            >
+                              {!priceAndStockUnlocked && <Lock size={12} />}
+                              <Pencil size={13} /> Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setProducts(
+                                  products.filter((p) => p.id !== prod.id)
+                                )
+                              }
+                              className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -2001,7 +2640,7 @@ export default function NegocioElCheleApp() {
               </div>
             </div>
 
-            {/* Materiales e Insumos */}
+            {/* Materiales e Insumos (Crear, Listar y Eliminar) */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
               <div className="flex flex-wrap justify-between items-center gap-2">
                 <div>
@@ -2009,14 +2648,68 @@ export default function NegocioElCheleApp() {
                     Materiales e Insumos (Empaques y Materia Prima)
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Se descuentan automáticamente al registrar ventas y se pueden
-                    ajustar con <strong>Actualizar inventario</strong>.
+                    Crea o elimina insumos, ajusta cantidades con{" "}
+                    <strong>Actualizar inventario</strong> o descuéntalos al
+                    vender.
                   </p>
                 </div>
                 <span className="inline-flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-1 rounded-full">
-                  <Lock size={13} /> Stock protegido
+                  <Lock size={13} /> Protegido con Negocio2026
                 </span>
               </div>
+
+              <form
+                onSubmit={handleAddSupply}
+                className="flex flex-wrap gap-3 items-end bg-slate-50 p-3.5 rounded-xl border border-slate-200"
+              >
+                <div className="flex-1 min-w-[180px]">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Nombre del insumo
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newSupplyName}
+                    onChange={(e) => setNewSupplyName(e.target.value)}
+                    placeholder="Ej. Leche entera, Vasos 12oz..."
+                    className="w-full p-2 border rounded-lg bg-white text-sm"
+                  />
+                </div>
+                <div className="w-40">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Tipo
+                  </label>
+                  <select
+                    value={newSupplyType}
+                    onChange={(e) => setNewSupplyType(e.target.value)}
+                    className="w-full p-2 border rounded-lg bg-white text-sm"
+                  >
+                    <option value="Materia Prima">Materia Prima</option>
+                    <option value="Empaques">Empaques</option>
+                  </select>
+                </div>
+                <div className="w-32">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Stock inicial
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={newSupplyStock}
+                    onChange={(e) => setNewSupplyStock(e.target.value)}
+                    placeholder="0"
+                    className="w-full p-2 border rounded-lg bg-white text-sm"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1"
+                >
+                  {!priceAndStockUnlocked && <Lock size={14} />}
+                  <Plus size={16} /> Crear Insumo
+                </button>
+              </form>
 
               <div className="overflow-x-auto max-h-96">
                 <table className="w-full text-left border-collapse text-sm">
@@ -2025,6 +2718,7 @@ export default function NegocioElCheleApp() {
                       <th className="p-3">Detalle</th>
                       <th className="p-3">Tipo</th>
                       <th className="p-3">Total disponible</th>
+                      <th className="p-3 text-right">Eliminar</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -2034,6 +2728,16 @@ export default function NegocioElCheleApp() {
                         <td className="p-3 text-slate-600">{sup.type}</td>
                         <td className="p-3 font-extrabold text-slate-900">
                           {sup.stock}
+                        </td>
+                        <td className="p-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSupply(sup)}
+                            className="inline-flex items-center gap-1 text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg text-xs font-bold"
+                          >
+                            {!priceAndStockUnlocked && <Lock size={12} />}
+                            <Trash2 size={15} />
+                          </button>
                         </td>
                       </tr>
                     ))}
