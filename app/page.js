@@ -18,8 +18,11 @@ import {
   ArrowRightLeft,
   Search,
   CheckCircle2,
-  Eye,
   EyeOff,
+  ClipboardCheck,
+  Calendar,
+  AlertCircle,
+  X,
 } from "lucide-react";
 
 const OWNER_PASSWORD = "Negocio2026";
@@ -96,94 +99,158 @@ const INITIAL_MENU = [
   },
 ];
 
+// Inventario inicial tomado de "Inventario Of." del Excel
 const INITIAL_SUPPLIES = [
   { id: "s1", name: "vasos de licuados", type: "Empaques", stock: 600 },
   { id: "s2", name: "vasos de minutas", type: "Empaques", stock: 300 },
   { id: "s3", name: "bandeja 11,1x11,1,x6,3", type: "Empaques", stock: 400 },
-  { id: "s4", name: "tenedores", type: "Empaques", stock: 300 },
-  { id: "s5", name: "cucharas", type: "Empaques", stock: 300 },
-  { id: "s6", name: "pajillas sin emboltorio azul", type: "Empaques", stock: 300 },
-  { id: "s7", name: "pajillas con emboltorio", type: "Empaques", stock: 340 },
-  { id: "s8", name: "servilletas", type: "Empaques", stock: 1000 },
+  { id: "s4", name: "stickers", type: "Empaques", stock: 0 },
+  { id: "s5", name: "tenedores", type: "Empaques", stock: 300 },
+  { id: "s6", name: "cucharas", type: "Empaques", stock: 300 },
+  { id: "s7", name: "pajillas sin emboltorio azul", type: "Empaques", stock: 300 },
+  { id: "s8", name: "pajillas con emboltorio", type: "Empaques", stock: 340 },
+  { id: "s9", name: "servilletas", type: "Empaques", stock: 1000 },
   {
-    id: "s9",
+    id: "s10",
     name: "Bolsas para guardar la fruta picada",
     type: "Empaques",
     stock: 300,
   },
-  { id: "s10", name: "Jarabes", type: "Materia Prima", stock: 8 },
-  { id: "s11", name: "Jalea de tamarindo", type: "Materia Prima", stock: 0 },
-  { id: "s12", name: "Guineo", type: "Materia Prima", stock: 36 },
-  { id: "s13", name: "Piña", type: "Materia Prima", stock: 3 },
-  { id: "s14", name: "Limon", type: "Materia Prima", stock: 200 },
-  { id: "s15", name: "Chile", type: "Materia Prima", stock: 1 },
-  { id: "s16", name: "Aiuashte", type: "Materia Prima", stock: 1 },
-  { id: "s17", name: "Salsa negra", type: "Materia Prima", stock: 1 },
-  { id: "s18", name: "Nachos", type: "Materia Prima", stock: 72 },
-  { id: "s19", name: "Hielo", type: "Materia Prima", stock: 400 },
-  { id: "s20", name: "Pepino", type: "Materia Prima", stock: 25 },
-  { id: "s21", name: "Tomate", type: "Materia Prima", stock: 75 },
-  { id: "s22", name: "Camaron", type: "Materia Prima", stock: 2000 },
+  { id: "s11", name: "Jarabes", type: "Materia Prima", stock: 8 },
+  { id: "s12", name: "Jalea de tamarindo", type: "Materia Prima", stock: 0 },
+  { id: "s13", name: "Guineo", type: "Materia Prima", stock: 36 },
+  { id: "s14", name: "Fresas", type: "Materia Prima", stock: 0 },
+  { id: "s15", name: "Piña", type: "Materia Prima", stock: 3 },
+  { id: "s16", name: "Sal", type: "Materia Prima", stock: 0 },
+  { id: "s17", name: "Limon", type: "Materia Prima", stock: 200 },
+  { id: "s18", name: "Chile", type: "Materia Prima", stock: 1 },
+  { id: "s19", name: "Aiuashte", type: "Materia Prima", stock: 1 },
+  { id: "s20", name: "Salsa negra", type: "Materia Prima", stock: 1 },
+  { id: "s21", name: "Tajin", type: "Materia Prima", stock: 0 },
+  { id: "s22", name: "Chamoy", type: "Materia Prima", stock: 0 },
+  { id: "s23", name: "Leche condensada", type: "Materia Prima", stock: 0 },
+  { id: "s24", name: "Chocolate", type: "Materia Prima", stock: 0 },
+  { id: "s25", name: "Picsi", type: "Materia Prima", stock: 0 },
+  { id: "s26", name: "Crispy", type: "Materia Prima", stock: 0 },
+  { id: "s27", name: "Nachos", type: "Materia Prima", stock: 72 },
+  { id: "s28", name: "Jalapeños", type: "Materia Prima", stock: 0 },
+  { id: "s29", name: "Hielo", type: "Materia Prima", stock: 400 },
+  { id: "s30", name: "Gomita", type: "Materia Prima", stock: 0 },
+  { id: "s31", name: "Mango", type: "Materia Prima", stock: 0 },
+  { id: "s32", name: "Pepino", type: "Materia Prima", stock: 25 },
+  { id: "s33", name: "Tomate", type: "Materia Prima", stock: 75 },
+  { id: "s34", name: "Cebolla", type: "Materia Prima", stock: 0 },
+  { id: "s35", name: "Cilantro", type: "Materia Prima", stock: 0 },
+  { id: "s36", name: "Jicama", type: "Materia Prima", stock: 0 },
+  { id: "s37", name: "Camaron (lote 1)", type: "Materia Prima", stock: 2000 },
+  { id: "s38", name: "Camaron (lote 2)", type: "Materia Prima", stock: 2000 },
   {
-    id: "s23",
+    id: "s39",
     name: "agua alpina en botella 699ml",
     type: "Materia Prima",
     stock: 72,
   },
-  { id: "s24", name: "lata sutida soda", type: "Materia Prima", stock: 24 },
-  { id: "s25", name: "lata coca cola soda", type: "Materia Prima", stock: 48 },
+  { id: "s40", name: "lata sutida soda", type: "Materia Prima", stock: 24 },
+  { id: "s41", name: "lata coca cola soda", type: "Materia Prima", stock: 48 },
+];
+
+const INITIAL_EMPLOYEES = [
+  {
+    id: "emp-kat",
+    name: "Kat",
+    startDate: "2026-12-03",
+    payDates: [
+      {
+        id: "kat-1",
+        label: "Pago 1 (Quincena)",
+        dueDate: "2026-12-15",
+        amount: 201.6,
+        note: "13,44 x día",
+        paid: false,
+        paidDate: "",
+      },
+      {
+        id: "kat-2",
+        label: "Pago 2 (Fin de mes)",
+        dueDate: "2026-12-30",
+        amount: 201.6,
+        note: "13,44 x día",
+        paid: false,
+        paidDate: "",
+      },
+    ],
+  },
+  {
+    id: "emp-gab",
+    name: "Gab",
+    startDate: "2026-12-04",
+    payDates: [
+      {
+        id: "gab-1",
+        label: "Pago 1 (Quincena)",
+        dueDate: "2026-12-15",
+        amount: 275.0,
+        note: "18,33 x día",
+        paid: false,
+        paidDate: "",
+      },
+      {
+        id: "gab-2",
+        label: "Pago 2 (Fin de mes)",
+        dueDate: "2026-12-30",
+        amount: 275.0,
+        note: "18,33 x día",
+        paid: false,
+        paidDate: "",
+      },
+    ],
+  },
 ];
 
 const INITIAL_FINANCIAL = {
   goal: 7000.0,
-  reinvestment: 0.0,
-  purchasesSummary: [
+  employees: INITIAL_EMPLOYEES,
+  otherDebts: [
     {
-      id: "p1",
-      type: "Financiado",
-      utensils: 480.25,
-      packaging: 162.45,
-      rawMaterial: 345.94,
-      transport: 40.0,
-      paid: 902.44,
+      id: "d-prestamo",
+      concept: "Prestamo",
+      amount: 1000.0,
+      date: "2026-12-03",
+      paid: false,
     },
     {
-      id: "p2",
-      type: "Plazo/tarjeta",
-      utensils: 696.9,
-      packaging: 0,
-      rawMaterial: 0,
-      transport: 0,
-      paid: 0,
+      id: "d-intereses",
+      concept: "Intereses",
+      amount: 200.0,
+      date: "2026-12-15",
+      paid: false,
     },
     {
-      id: "p3",
-      type: "Contado Ever",
-      utensils: 100.0,
-      packaging: 0,
-      rawMaterial: 0,
-      transport: 0,
-      paid: 100.0,
+      id: "d-tarjeta",
+      concept: "Plazo/tarjeta",
+      amount: 696.9,
+      date: "2026-12-30",
+      paid: false,
+    },
+    {
+      id: "d-ever",
+      concept: "Contado Ever",
+      amount: 0.0,
+      date: "2026-12-03",
+      paid: true,
     },
   ],
-  debts: [
-    { id: "d1", concept: "Salario Kat. 1", amount: 201.6, note: "13,44 x día" },
-    { id: "d2", concept: "Salario Gab. 1", amount: 275.0, note: "18,33 x día" },
-    { id: "d3", concept: "Salario Kat. 2", amount: 201.6, note: "13,44 x día" },
-    { id: "d4", concept: "Salario Gab. 2", amount: 275.0, note: "18,33 x día" },
-    { id: "d5", concept: "Prestamo", amount: 1000.0, note: "" },
-    { id: "d6", concept: "Intereses", amount: 200.0, note: "" },
-    { id: "d7", concept: "Plazo/tarjeta", amount: 696.9, note: "" },
-    { id: "d8", concept: "Contado Ever", amount: 0.0, note: "" },
-  ],
+  reinvestments: [],
 };
 
 export default function NegocioElCheleApp() {
   const [activeTab, setActiveTab] = useState("pos");
   const [products, setProducts] = useState([]);
   const [supplies, setSupplies] = useState([]);
+  const [inventoryLogs, setInventoryLogs] = useState([]);
   const [sales, setSales] = useState([]);
   const [financial, setFinancial] = useState(INITIAL_FINANCIAL);
+
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("Todos");
 
@@ -193,31 +260,53 @@ export default function NegocioElCheleApp() {
   const [cashGiven, setCashGiven] = useState("");
   const [saleSuccess, setSaleSuccess] = useState(false);
 
-  // Seguridad con contraseña para precios y sección Financiero
+  // Contraseña para Financiero y Precios
   const [pricesUnlocked, setPricesUnlocked] = useState(false);
   const [financialUnlocked, setFinancialUnlocked] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [pendingAction, setPendingAction] = useState(null); // 'prices' | 'financial'
 
-  // Formularios de inventario
+  // Modal "Actualizar inventario"
+  const [updateInvModalOpen, setUpdateInvModalOpen] = useState(false);
+  const [invUpdateDate, setInvUpdateDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [invUpdateMode, setInvUpdateMode] = useState("entrada"); // 'entrada' | 'salida' | 'conteo'
+  const [invUpdateNote, setInvUpdateNote] = useState("");
+  const [invDraftInputs, setInvDraftInputs] = useState({});
+
+  // Nuevo producto de menú
   const [newProdName, setNewProdName] = useState("");
   const [newProdCategory, setNewProdCategory] = useState("Minutas");
   const [newProdPrice, setNewProdPrice] = useState("");
   const [newProdStock, setNewProdStock] = useState("");
 
-  const [newSupplyName, setNewSupplyName] = useState("");
-  const [newSupplyType, setNewSupplyType] = useState("Materia Prima");
-  const [newSupplyStock, setNewSupplyStock] = useState("");
+  // Nuevos registros financieros (deuda / reinversión / fecha de pago)
+  const [newDebtConcept, setNewDebtConcept] = useState("");
+  const [newDebtAmount, setNewDebtAmount] = useState("");
+  const [newDebtDate, setNewDebtDate] = useState("2026-12-15");
+
+  const [newReinvConcept, setNewReinvConcept] = useState("");
+  const [newReinvCategory, setNewReinvCategory] = useState("Minutas");
+  const [newReinvAmount, setNewReinvAmount] = useState("");
+  const [newReinvDate, setNewReinvDate] = useState("2026-12-04");
+
+  const [extraPayEmpId, setExtraPayEmpId] = useState("emp-kat");
+  const [extraPayLabel, setExtraPayLabel] = useState("Pago adicional");
+  const [extraPayDate, setExtraPayDate] = useState("2026-12-15");
+  const [extraPayAmount, setExtraPayAmount] = useState("");
 
   useEffect(() => {
-    const savedProducts = localStorage.getItem("chele_v2_products");
-    const savedSupplies = localStorage.getItem("chele_v2_supplies");
-    const savedSales = localStorage.getItem("chele_v2_sales");
-    const savedFinancial = localStorage.getItem("chele_v2_financial");
+    const savedProducts = localStorage.getItem("chele_v3_products");
+    const savedSupplies = localStorage.getItem("chele_v3_supplies");
+    const savedInvLogs = localStorage.getItem("chele_v3_inv_logs");
+    const savedSales = localStorage.getItem("chele_v3_sales");
+    const savedFinancial = localStorage.getItem("chele_v3_financial");
 
     setProducts(savedProducts ? JSON.parse(savedProducts) : INITIAL_MENU);
     setSupplies(savedSupplies ? JSON.parse(savedSupplies) : INITIAL_SUPPLIES);
+    setInventoryLogs(savedInvLogs ? JSON.parse(savedInvLogs) : []);
     setSales(savedSales ? JSON.parse(savedSales) : []);
     setFinancial(
       savedFinancial ? JSON.parse(savedFinancial) : INITIAL_FINANCIAL
@@ -226,25 +315,29 @@ export default function NegocioElCheleApp() {
 
   useEffect(() => {
     if (products.length > 0) {
-      localStorage.setItem("chele_v2_products", JSON.stringify(products));
+      localStorage.setItem("chele_v3_products", JSON.stringify(products));
     }
   }, [products]);
 
   useEffect(() => {
     if (supplies.length > 0) {
-      localStorage.setItem("chele_v2_supplies", JSON.stringify(supplies));
+      localStorage.setItem("chele_v3_supplies", JSON.stringify(supplies));
     }
   }, [supplies]);
 
   useEffect(() => {
-    localStorage.setItem("chele_v2_sales", JSON.stringify(sales));
+    localStorage.setItem("chele_v3_inv_logs", JSON.stringify(inventoryLogs));
+  }, [inventoryLogs]);
+
+  useEffect(() => {
+    localStorage.setItem("chele_v3_sales", JSON.stringify(sales));
   }, [sales]);
 
   useEffect(() => {
-    localStorage.setItem("chele_v2_financial", JSON.stringify(financial));
+    localStorage.setItem("chele_v3_financial", JSON.stringify(financial));
   }, [financial]);
 
-  // --- VALIDACIÓN DE CONTRASEÑA ---
+  // --- CONTRASEÑA ---
   const openPasswordModal = (target) => {
     setPasswordInput("");
     setPasswordError("");
@@ -264,19 +357,86 @@ export default function NegocioElCheleApp() {
       setPasswordInput("");
       setPasswordError("");
     } else {
-      setPasswordError("Contraseña incorrecta. Solo el dueño con Negocio2026 puede acceder.");
+      setPasswordError("Contraseña incorrecta. Ingresa Negocio2026.");
     }
   };
 
-  const handleSelectFinancialTab = () => {
-    if (financialUnlocked) {
-      setActiveTab("financial");
-    } else {
-      openPasswordModal("financial");
-    }
+  // --- ACTUALIZAR INVENTARIO CON HISTORIAL ---
+  const openUpdateInventoryModal = () => {
+    const initialMap = {};
+    supplies.forEach((s) => {
+      initialMap[s.id] = "";
+    });
+    setInvDraftInputs(initialMap);
+    setInvUpdateDate(new Date().toISOString().slice(0, 10));
+    setInvUpdateMode("entrada");
+    setInvUpdateNote("");
+    setUpdateInvModalOpen(true);
   };
 
-  // --- CARRITO Y VENTAS ---
+  const handleSaveInventoryUpdate = (e) => {
+    e.preventDefault();
+    const changedItems = [];
+
+    const updatedSupplies = supplies.map((sup) => {
+      const rawVal = invDraftInputs[sup.id];
+      if (rawVal === "" || rawVal === undefined) return sup;
+
+      const qty = parseFloat(rawVal);
+      if (Number.isNaN(qty) || qty < 0) return sup;
+
+      const prevStock = sup.stock;
+      let nextStock = prevStock;
+      let delta = 0;
+
+      if (invUpdateMode === "entrada") {
+        nextStock = prevStock + qty;
+        delta = qty;
+      } else if (invUpdateMode === "salida") {
+        nextStock = Math.max(0, prevStock - qty);
+        delta = nextStock - prevStock;
+      } else if (invUpdateMode === "conteo") {
+        nextStock = qty;
+        delta = nextStock - prevStock;
+      }
+
+      if (nextStock !== prevStock) {
+        changedItems.push({
+          supplyId: sup.id,
+          name: sup.name,
+          type: sup.type,
+          mode: invUpdateMode,
+          inputQty: qty,
+          previousStock: prevStock,
+          newStock: nextStock,
+          delta,
+        });
+      }
+
+      return { ...sup, stock: nextStock };
+    });
+
+    if (changedItems.length === 0) {
+      alert("Ingresa al menos una cantidad para actualizar el inventario.");
+      return;
+    }
+
+    setSupplies(updatedSupplies);
+
+    const newLogEntry = {
+      id: `log-${Date.now()}`,
+      date: invUpdateDate,
+      recordedAt: new Date().toLocaleString("es-SV"),
+      mode: invUpdateMode,
+      note: invUpdateNote.trim(),
+      items: changedItems,
+    };
+
+    setInventoryLogs([newLogEntry, ...inventoryLogs]);
+    setUpdateInvModalOpen(false);
+  };
+
+  // --- VENTAS Y CARRITO ---
   const addToCart = (product) => {
     if (product.stock <= 0) return;
     const existing = cart.find((item) => item.id === product.id);
@@ -323,7 +483,7 @@ export default function NegocioElCheleApp() {
       paymentMethod === "Efectivo" &&
       (Number.isNaN(cashNum) || cashNum < cartTotal)
     ) {
-      alert("Ingresa un monto en efectivo igual o mayor al total a pagar.");
+      alert("El monto en efectivo debe ser igual o mayor al total.");
       return;
     }
 
@@ -353,7 +513,7 @@ export default function NegocioElCheleApp() {
     setTimeout(() => setSaleSuccess(false), 3000);
   };
 
-  // --- EDICIÓN PROTEGIDA DE PRECIOS ---
+  // --- PRECIOS PROTEGIDOS ---
   const handlePriceChange = (productId, rawValue) => {
     if (!pricesUnlocked) {
       openPasswordModal("prices");
@@ -362,16 +522,9 @@ export default function NegocioElCheleApp() {
     const parsed = parseFloat(rawValue);
     setProducts(
       products.map((p) =>
-        p.id === productId ? { ...p, price: Number.isNaN(parsed) ? 0 : parsed } : p
-      )
-    );
-  };
-
-  const handleProductStockChange = (productId, rawValue) => {
-    const parsed = parseInt(rawValue, 10);
-    setProducts(
-      products.map((p) =>
-        p.id === productId ? { ...p, stock: Number.isNaN(parsed) ? 0 : parsed } : p
+        p.id === productId
+          ? { ...p, price: Number.isNaN(parsed) ? 0 : parsed }
+          : p
       )
     );
   };
@@ -384,7 +537,6 @@ export default function NegocioElCheleApp() {
       openPasswordModal("prices");
       return;
     }
-    const stockVal = parseInt(newProdStock, 10) || 0;
     setProducts([
       ...products,
       {
@@ -392,8 +544,8 @@ export default function NegocioElCheleApp() {
         name: newProdName.trim(),
         category: newProdCategory,
         price: Number.isNaN(priceVal) ? 0 : priceVal,
-        stock: stockVal,
-        description: "Producto agregado desde inventario",
+        stock: parseInt(newProdStock, 10) || 0,
+        description: "",
       },
     ]);
     setNewProdName("");
@@ -401,140 +553,212 @@ export default function NegocioElCheleApp() {
     setNewProdStock("");
   };
 
-  const handleAddSupply = (e) => {
+  // --- FINANCIERO: EMPLEADOS, DEUDAS Y REINVERSIONES ---
+  const toggleEmployeePayment = (empId, payId) => {
+    setFinancial({
+      ...financial,
+      employees: financial.employees.map((emp) => {
+        if (emp.id !== empId) return emp;
+        return {
+          ...emp,
+          payDates: emp.payDates.map((pd) =>
+            pd.id === payId
+              ? {
+                  ...pd,
+                  paid: !pd.paid,
+                  paidDate: !pd.paid
+                    ? new Date().toISOString().slice(0, 10)
+                    : "",
+                }
+              : pd
+          ),
+        };
+      }),
+    });
+  };
+
+  const handleAddEmployeePayDate = (e) => {
     e.preventDefault();
-    if (!newSupplyName.trim()) return;
-    setSupplies([
-      ...supplies,
-      {
-        id: `s-${Date.now()}`,
-        name: newSupplyName.trim(),
-        type: newSupplyType,
-        stock: parseInt(newSupplyStock, 10) || 0,
-      },
-    ]);
-    setNewSupplyName("");
-    setNewSupplyStock("");
+    const amt = parseFloat(extraPayAmount);
+    if (!extraPayLabel.trim() || Number.isNaN(amt) || amt <= 0) return;
+
+    setFinancial({
+      ...financial,
+      employees: financial.employees.map((emp) =>
+        emp.id === extraPayEmpId
+          ? {
+              ...emp,
+              payDates: [
+                ...emp.payDates,
+                {
+                  id: `pay-${Date.now()}`,
+                  label: extraPayLabel.trim(),
+                  dueDate: extraPayDate,
+                  amount: amt,
+                  note: "Fecha registrada",
+                  paid: false,
+                  paidDate: "",
+                },
+              ],
+            }
+          : emp
+      ),
+    });
+    setExtraPayLabel("Pago adicional");
+    setExtraPayAmount("");
   };
 
-  // --- IMPORTAR / EXPORTAR EXCEL ---
-  const handleExcelUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const bstr = evt.target?.result;
-      const wb = XLSX.read(bstr, { type: "binary" });
+  const handleAddDebt = (e) => {
+    e.preventDefault();
+    const amt = parseFloat(newDebtAmount);
+    if (!newDebtConcept.trim() || Number.isNaN(amt) || amt <= 0) return;
 
-      // Si el Excel trae hoja "Menu"
-      if (wb.SheetNames.includes("Menu")) {
-        const menuRows = XLSX.utils.sheet_to_json(wb.Sheets["Menu"]);
-        if (menuRows.length > 0) {
-          const parsedMenu = menuRows.map((row, idx) => ({
-            id: Date.now() + idx,
-            name: row.Producto || row.producto || row.Detalle || `Producto ${idx + 1}`,
-            category: row.Categoria || row.categoria || "Minutas",
-            price: parseFloat(row.Precio ?? row.precio ?? 0) || 0,
-            stock: parseInt(row.Stock ?? row.stock ?? 30, 10) || 0,
-            description: row.Descripción || row.Descripcion || "",
-          }));
-          setProducts(parsedMenu);
-        }
-      }
-
-      // Si el Excel trae hoja "Inventario Of." o una hoja genérica con Detalle
-      const invSheetName = wb.SheetNames.includes("Inventario Of.")
-        ? "Inventario Of."
-        : wb.SheetNames[0];
-      const rawRows = XLSX.utils.sheet_to_json(wb.Sheets[invSheetName], {
-        defval: "",
-      });
-
-      const validSupplies = rawRows
-        .filter(
-          (r) =>
-            r["Detalle"] &&
-            String(r["Detalle"]).trim() !== "" &&
-            String(r["Detalle"]).toLowerCase() !== "detalle"
-        )
-        .map((r, i) => ({
-          id: `imp-${Date.now()}-${i}`,
-          name: String(r["Detalle"]).trim(),
-          type: r["Tipo"] ? String(r["Tipo"]).trim() : "Materia Prima",
-          stock: parseFloat(r["Total disponible"]) || 0,
-        }));
-
-      if (validSupplies.length > 0) {
-        setSupplies(validSupplies);
-      }
-
-      alert("Archivo Excel cargado correctamente.");
-    };
-    reader.readAsBinaryString(file);
+    setFinancial({
+      ...financial,
+      otherDebts: [
+        ...financial.otherDebts,
+        {
+          id: `debt-${Date.now()}`,
+          concept: newDebtConcept.trim(),
+          amount: amt,
+          date: newDebtDate,
+          paid: false,
+        },
+      ],
+    });
+    setNewDebtConcept("");
+    setNewDebtAmount("");
   };
 
-  const exportAllToExcel = () => {
+  const toggleDebtPaid = (debtId) => {
+    setFinancial({
+      ...financial,
+      otherDebts: financial.otherDebts.map((d) =>
+        d.id === debtId ? { ...d, paid: !d.paid } : d
+      ),
+    });
+  };
+
+  const handleAddReinvestment = (e) => {
+    e.preventDefault();
+    const amt = parseFloat(newReinvAmount);
+    if (!newReinvConcept.trim() || Number.isNaN(amt) || amt <= 0) return;
+
+    setFinancial({
+      ...financial,
+      reinvestments: [
+        {
+          id: `reinv-${Date.now()}`,
+          concept: newReinvConcept.trim(),
+          category: newReinvCategory,
+          amount: amt,
+          date: newReinvDate,
+        },
+        ...financial.reinvestments,
+      ],
+    });
+    setNewReinvConcept("");
+    setNewReinvAmount("");
+  };
+
+  // --- EXPORTAR EXCEL ---
+  const exportToExcel = () => {
     const wb = XLSX.utils.book_new();
 
-    const menuData = products.map((p) => ({
-      Producto: p.name,
-      Categoria: p.category,
-      Precio: p.price,
-      Stock: p.stock,
-      Descripcion: p.description,
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(menuData), "Menu");
-
-    const invData = supplies.map((s) => ({
-      Detalle: s.name,
-      Tipo: s.type,
-      "Total disponible": s.stock,
-    }));
     XLSX.utils.book_append_sheet(
       wb,
-      XLSX.utils.json_to_sheet(invData),
+      XLSX.utils.json_to_sheet(
+        products.map((p) => ({
+          Producto: p.name,
+          Categoria: p.category,
+          Precio: p.price,
+          Stock: p.stock,
+        }))
+      ),
+      "Menu"
+    );
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.json_to_sheet(
+        supplies.map((s) => ({
+          Detalle: s.name,
+          Tipo: s.type,
+          "Total disponible": s.stock,
+        }))
+      ),
       "Inventario"
     );
 
-    const salesData = sales.map((s) => ({
-      Fecha: s.date,
-      Productos: s.items.map((i) => `${i.qty}x ${i.name}`).join(", "),
-      Total: Number(s.total.toFixed(2)),
-      Metodo_Pago: s.paymentMethod,
-      Efectivo_Recibido: Number(s.cashGiven.toFixed(2)),
-      Cambio: Number(s.change.toFixed(2)),
-    }));
+    const flatLogs = inventoryLogs.flatMap((log) =>
+      log.items.map((it) => ({
+        Fecha_Movimiento: log.date,
+        Registrado: log.recordedAt,
+        Tipo_Actualizacion: log.mode,
+        Insumo: it.name,
+        Categoria: it.type,
+        Cantidad_Ingresada: it.inputQty,
+        Stock_Anterior: it.previousStock,
+        Stock_Nuevo: it.newStock,
+        Nota: log.note || "",
+      }))
+    );
     XLSX.utils.book_append_sheet(
       wb,
-      XLSX.utils.json_to_sheet(salesData),
+      XLSX.utils.json_to_sheet(flatLogs),
+      "Historial_Inventario"
+    );
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.json_to_sheet(
+        sales.map((s) => ({
+          Fecha: s.date,
+          Productos: s.items.map((i) => `${i.qty}x ${i.name}`).join(", "),
+          Total: Number(s.total.toFixed(2)),
+          Metodo_Pago: s.paymentMethod,
+          Cambio: Number(s.change.toFixed(2)),
+        }))
+      ),
       "Ventas"
     );
 
-    XLSX.writeFile(wb, "Minutas_el_Chele_Control.xlsx");
+    XLSX.writeFile(wb, "Minutas_el_Chele_Completo.xlsx");
   };
 
   // --- CÁLCULOS FINANCIEROS ---
   const totalSold = sales.reduce((acc, s) => acc + s.total, 0);
-  const totalDebts = financial.debts.reduce(
-    (acc, d) => acc + (parseFloat(d.amount) || 0),
+
+  const pendingEmployeePay = financial.employees.reduce((sum, emp) => {
+    return (
+      sum +
+      emp.payDates
+        .filter((pd) => !pd.paid)
+        .reduce((s, pd) => s + (parseFloat(pd.amount) || 0), 0)
+    );
+  }, 0);
+
+  const paidEmployeePay = financial.employees.reduce((sum, emp) => {
+    return (
+      sum +
+      emp.payDates
+        .filter((pd) => pd.paid)
+        .reduce((s, pd) => s + (parseFloat(pd.amount) || 0), 0)
+    );
+  }, 0);
+
+  const pendingOtherDebts = financial.otherDebts
+    .filter((d) => !d.paid)
+    .reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+
+  const totalReinvestments = financial.reinvestments.reduce(
+    (sum, r) => sum + (parseFloat(r.amount) || 0),
     0
   );
-  const totalPurchases = financial.purchasesSummary.reduce(
-    (acc, p) =>
-      acc +
-      (parseFloat(p.utensils) || 0) +
-      (parseFloat(p.packaging) || 0) +
-      (parseFloat(p.rawMaterial) || 0) +
-      (parseFloat(p.transport) || 0),
-    0
-  );
-  const totalPaidPurchases = financial.purchasesSummary.reduce(
-    (acc, p) => acc + (parseFloat(p.paid) || 0),
-    0
-  );
-  const pendingPurchases = totalPaidPurchases - totalPurchases;
-  const netProfit = totalSold - totalDebts;
-  const profitMinusReinvest = netProfit - (parseFloat(financial.reinvestment) || 0);
+
+  // Dinero disponible real en caja (ventas menos pagos ya realizados y reinversiones)
+  const availableCash = totalSold - paidEmployeePay - totalReinvestments;
+  const totalPendingObligations = pendingEmployeePay + pendingOtherDebts;
 
   const filteredProducts = products.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
@@ -552,8 +776,8 @@ export default function NegocioElCheleApp() {
             onSubmit={handlePasswordSubmit}
             className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-sm w-full p-6 space-y-4"
           >
-            <div className="flex items-center gap-2 text-blue-700 font-bold text-lg">
-              <Lock size={22} />
+            <div className="flex items-center gap-2 text-blue-800 font-bold text-lg">
+              <Lock size={20} />
               <span>
                 {pendingAction === "financial"
                   ? "Acceso a Financiero"
@@ -561,45 +785,177 @@ export default function NegocioElCheleApp() {
               </span>
             </div>
             <p className="text-sm text-slate-600">
-              {pendingAction === "financial"
-                ? "Esta sección está protegida. Ingresa la contraseña del dueño para ver y registrar datos financieros."
-                : "Solo el dueño puede modificar precios. Ingresa la contraseña para desbloquear."}
+              Ingresa la contraseña del dueño para continuar.
             </p>
-            <div>
-              <input
-                type="password"
-                autoFocus
-                placeholder="Contraseña"
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                className="w-full p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-              {passwordError && (
-                <p className="text-xs text-red-600 font-medium mt-1.5">
-                  {passwordError}
-                </p>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <input
+              type="password"
+              autoFocus
+              placeholder="Contraseña"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              className="w-full p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600"
+            />
+            {passwordError && (
+              <p className="text-xs text-red-600 font-semibold">
+                {passwordError}
+              </p>
+            )}
+            <div className="flex justify-end gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => setPendingAction(null)}
-                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50"
+                className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-medium hover:bg-slate-50"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-blue-700 text-white text-sm font-semibold hover:bg-blue-800"
+                className="px-4 py-2 rounded-xl bg-blue-800 text-white text-sm font-semibold hover:bg-blue-900"
               >
-                Desbloquear
+                Entrar
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* ENCABEZADO */}
+      {/* MODAL ACTUALIZAR INVENTARIO */}
+      {updateInvModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSaveInventoryUpdate}
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[90vh] flex flex-col"
+          >
+            <div className="p-5 border-b flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Actualizar Inventario de Materiales e Insumos
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Registra cantidades y se guardará automáticamente en el
+                  historial.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUpdateInvModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 border-b bg-slate-50 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Fecha del registro
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={invUpdateDate}
+                  onChange={(e) => setInvUpdateDate(e.target.value)}
+                  className="w-full p-2 border rounded-xl bg-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Tipo de actualización
+                </label>
+                <select
+                  value={invUpdateMode}
+                  onChange={(e) => setInvUpdateMode(e.target.value)}
+                  className="w-full p-2 border rounded-xl bg-white text-sm font-medium"
+                >
+                  <option value="entrada">Sumar entrada (+)</option>
+                  <option value="salida">Restar salida (-)</option>
+                  <option value="conteo">Fijar stock exacto (=)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Nota / Referencia
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. Compra de insumos del día"
+                  value={invUpdateNote}
+                  onChange={(e) => setInvUpdateNote(e.target.value)}
+                  className="w-full p-2 border rounded-xl bg-white text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead className="bg-slate-100 border-b text-xs uppercase text-slate-600 sticky top-0">
+                  <tr>
+                    <th className="p-2.5">Material / Insumo</th>
+                    <th className="p-2.5">Tipo</th>
+                    <th className="p-2.5">Stock actual</th>
+                    <th className="p-2.5">
+                      {invUpdateMode === "entrada"
+                        ? "Cantidad a sumar"
+                        : invUpdateMode === "salida"
+                        ? "Cantidad a restar"
+                        : "Nuevo stock"}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {supplies.map((sup) => (
+                    <tr key={sup.id} className="hover:bg-slate-50">
+                      <td className="p-2.5 font-medium">{sup.name}</td>
+                      <td className="p-2.5 text-slate-500 text-xs">
+                        {sup.type}
+                      </td>
+                      <td className="p-2.5 font-bold text-slate-700">
+                        {sup.stock}
+                      </td>
+                      <td className="p-2.5">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder="—"
+                          value={invDraftInputs[sup.id] ?? ""}
+                          onChange={(e) =>
+                            setInvDraftInputs({
+                              ...invDraftInputs,
+                              [sup.id]: e.target.value,
+                            })
+                          }
+                          className="w-28 p-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-4 border-t bg-slate-50 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setUpdateInvModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-medium hover:bg-white"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold"
+              >
+                Guardar Actualización
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* HEADER */}
       <header className="bg-blue-800 text-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-3">
           <div>
@@ -607,7 +963,7 @@ export default function NegocioElCheleApp() {
               🍧 Minutas el Chele
             </h1>
             <p className="text-xs text-blue-200">
-              Ventas, Inventario y Control de Negocio
+              Ventas, Inventario Diario y Control Financiero
             </p>
           </div>
 
@@ -620,7 +976,7 @@ export default function NegocioElCheleApp() {
                   : "bg-blue-900/70 hover:bg-blue-700"
               }`}
             >
-              <ShoppingCart size={17} /> Ventas (POS)
+              <ShoppingCart size={17} /> Ventas
             </button>
 
             <button
@@ -642,11 +998,15 @@ export default function NegocioElCheleApp() {
                   : "bg-blue-900/70 hover:bg-blue-700"
               }`}
             >
-              <History size={17} /> Historial ({sales.length})
+              <History size={17} /> Historial Ventas ({sales.length})
             </button>
 
             <button
-              onClick={handleSelectFinancialTab}
+              onClick={() =>
+                financialUnlocked
+                  ? setActiveTab("financial")
+                  : openPasswordModal("financial")
+              }
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition ${
                 activeTab === "financial"
                   ? "bg-amber-400 text-slate-950 shadow"
@@ -660,9 +1020,9 @@ export default function NegocioElCheleApp() {
         </div>
       </header>
 
-      {/* CONTENIDO PRINCIPAL */}
+      {/* MAIN */}
       <main className="max-w-7xl w-full mx-auto p-4 flex-1">
-        {/* 1. PUNTO DE VENTA */}
+        {/* 1. VENTAS */}
         {activeTab === "pos" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
@@ -674,7 +1034,7 @@ export default function NegocioElCheleApp() {
                   />
                   <input
                     type="text"
-                    placeholder="Buscar minuta o licuado..."
+                    placeholder="Buscar producto..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
@@ -704,7 +1064,7 @@ export default function NegocioElCheleApp() {
                     key={product.id}
                     onClick={() => addToCart(product)}
                     disabled={product.stock <= 0}
-                    className={`p-4 rounded-2xl border text-left transition flex flex-col justify-between min-h-[140px] ${
+                    className={`p-4 rounded-2xl border text-left transition flex flex-col justify-between min-h-[135px] ${
                       product.stock > 0
                         ? "bg-white border-slate-200 hover:border-blue-600 hover:shadow-md active:scale-[0.99]"
                         : "bg-slate-200 border-slate-300 opacity-60 cursor-not-allowed"
@@ -738,7 +1098,7 @@ export default function NegocioElCheleApp() {
                         }`}
                       >
                         {product.stock > 0
-                          ? `Disp: ${product.stock}`
+                          ? `Stock: ${product.stock}`
                           : "Agotado"}
                       </span>
                     </div>
@@ -747,24 +1107,24 @@ export default function NegocioElCheleApp() {
               </div>
             </div>
 
-            {/* CAJA DE COBRO */}
+            {/* CAJA */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between h-fit sticky top-4">
               <div>
                 <div className="flex items-center justify-between border-b pb-3 mb-3">
-                  <h2 className="text-lg font-bold">Detalle de Venta</h2>
+                  <h2 className="text-lg font-bold">Orden de Venta</h2>
                   {cart.length > 0 && (
                     <button
                       onClick={() => setCart([])}
                       className="text-xs text-red-600 font-medium hover:underline"
                     >
-                      Vaciar
+                      Limpiar
                     </button>
                   )}
                 </div>
 
                 {cart.length === 0 ? (
                   <p className="text-slate-400 text-center py-8 text-sm">
-                    Selecciona un producto para comenzar la venta.
+                    Selecciona productos para registrar una venta.
                   </p>
                 ) : (
                   <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1 mb-4">
@@ -846,7 +1206,7 @@ export default function NegocioElCheleApp() {
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
                     <div className="flex justify-between items-center gap-2">
                       <label className="text-sm font-medium text-slate-700">
-                        Recibido ($):
+                        Efectivo recibido ($):
                       </label>
                       <input
                         type="number"
@@ -882,8 +1242,7 @@ export default function NegocioElCheleApp() {
 
                 {saleSuccess && (
                   <div className="flex items-center justify-center gap-2 text-green-800 bg-green-100 p-2.5 rounded-xl text-sm font-semibold">
-                    <CheckCircle2 size={18} /> ¡Venta guardada e inventario
-                    actualizado!
+                    <CheckCircle2 size={18} /> ¡Venta guardada!
                   </div>
                 )}
               </div>
@@ -891,21 +1250,30 @@ export default function NegocioElCheleApp() {
           </div>
         )}
 
-        {/* 2. INVENTARIO Y PRECIOS PROTEGIDOS */}
+        {/* 2. INVENTARIO DIARIO Y PRECIOS PROTEGIDOS */}
         {activeTab === "inventory" && (
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
               <div>
                 <h2 className="text-lg font-bold">
-                  Inventario y Lista de Productos
+                  Inventario Diario y Control de Stock
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Sube tu Excel para actualizar productos o insumos. Los precios
-                  están protegidos con contraseña.
+                  Inicia con tu inventario del Excel. Para evitar errores
+                  manuales, el stock de insumos solo cambia usando{" "}
+                  <strong>Actualizar inventario</strong>.
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-2.5">
+                <button
+                  type="button"
+                  onClick={openUpdateInventoryModal}
+                  className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition"
+                >
+                  <ClipboardCheck size={17} /> Actualizar inventario
+                </button>
+
                 <button
                   type="button"
                   onClick={() =>
@@ -920,25 +1288,17 @@ export default function NegocioElCheleApp() {
                   }`}
                 >
                   {pricesUnlocked ? <Unlock size={16} /> : <Lock size={16} />}
-                  {pricesUnlocked ? "Precios Desbloqueados" : "Desbloquear Precios"}
+                  {pricesUnlocked
+                    ? "Precios Desbloqueados"
+                    : "Desbloquear Precios"}
                 </button>
-
-                <label className="cursor-pointer flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-xl text-sm font-semibold transition">
-                  <Upload size={16} /> Cargar Excel
-                  <input
-                    type="file"
-                    accept=".xlsx, .xls, .csv"
-                    onChange={handleExcelUpload}
-                    className="hidden"
-                  />
-                </label>
 
                 <button
                   type="button"
-                  onClick={exportAllToExcel}
+                  onClick={exportToExcel}
                   className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-semibold transition"
                 >
-                  <Download size={16} /> Descargar Excel
+                  <Download size={16} /> Exportar Excel
                 </button>
               </div>
             </div>
@@ -946,7 +1306,7 @@ export default function NegocioElCheleApp() {
             {/* Productos del Menú */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
               <h3 className="font-bold text-slate-800">
-                Productos a la Venta (Menú)
+                Productos del Menú (Precios protegidos con Negocio2026)
               </h3>
 
               <form
@@ -955,18 +1315,17 @@ export default function NegocioElCheleApp() {
               >
                 <div className="flex-1 min-w-[180px]">
                   <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Nombre del Producto
+                    Nombre
                   </label>
                   <input
                     type="text"
                     required
                     value={newProdName}
                     onChange={(e) => setNewProdName(e.target.value)}
-                    placeholder="Ej. Minuta de tamarindo"
+                    placeholder="Nombre del producto"
                     className="w-full p-2 border rounded-lg bg-white text-sm"
                   />
                 </div>
-
                 <div className="w-36">
                   <label className="block text-xs font-semibold text-slate-600 mb-1">
                     Categoría
@@ -978,10 +1337,8 @@ export default function NegocioElCheleApp() {
                   >
                     <option value="Minutas">Minutas</option>
                     <option value="Licuados">Licuados</option>
-                    <option value="Bebidas">Bebidas</option>
                   </select>
                 </div>
-
                 <div className="w-28">
                   <label className="block text-xs font-semibold text-slate-600 mb-1">
                     Precio ($)
@@ -996,7 +1353,6 @@ export default function NegocioElCheleApp() {
                     className="w-full p-2 border rounded-lg bg-white text-sm"
                   />
                 </div>
-
                 <div className="w-28">
                   <label className="block text-xs font-semibold text-slate-600 mb-1">
                     Stock
@@ -1006,21 +1362,20 @@ export default function NegocioElCheleApp() {
                     required
                     value={newProdStock}
                     onChange={(e) => setNewProdStock(e.target.value)}
-                    placeholder="25"
+                    placeholder="20"
                     className="w-full p-2 border rounded-lg bg-white text-sm"
                   />
                 </div>
-
                 <button
                   type="submit"
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1"
+                  className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1"
                 >
                   <Plus size={16} /> Agregar
                 </button>
               </form>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse text-sm">
                   <thead className="bg-slate-50 border-b text-xs uppercase text-slate-500">
                     <tr>
                       <th className="p-3">Producto</th>
@@ -1030,7 +1385,7 @@ export default function NegocioElCheleApp() {
                       <th className="p-3 text-right">Eliminar</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y text-sm">
+                  <tbody className="divide-y">
                     {products.map((prod) => (
                       <tr key={prod.id} className="hover:bg-slate-50">
                         <td className="p-3 font-semibold">{prod.name}</td>
@@ -1051,8 +1406,8 @@ export default function NegocioElCheleApp() {
                               }
                               className={`w-24 p-1.5 border rounded-lg font-bold ${
                                 pricesUnlocked
-                                  ? "bg-white border-amber-400 text-slate-900"
-                                  : "bg-slate-100 border-slate-200 text-slate-700 cursor-pointer"
+                                  ? "bg-white border-amber-400"
+                                  : "bg-slate-100 border-slate-200 cursor-pointer"
                               }`}
                             />
                             {!pricesUnlocked && (
@@ -1060,21 +1415,12 @@ export default function NegocioElCheleApp() {
                             )}
                           </div>
                         </td>
-                        <td className="p-3">
-                          <input
-                            type="number"
-                            value={prod.stock}
-                            onChange={(e) =>
-                              handleProductStockChange(prod.id, e.target.value)
-                            }
-                            className="w-20 p-1.5 border rounded-lg font-semibold"
-                          />
-                        </td>
+                        <td className="p-3 font-bold">{prod.stock}</td>
                         <td className="p-3 text-right">
                           <button
                             onClick={() =>
                               setProducts(
-                                products.filter((item) => item.id !== prod.id)
+                                products.filter((p) => p.id !== prod.id)
                               )
                             }
                             className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg"
@@ -1089,65 +1435,25 @@ export default function NegocioElCheleApp() {
               </div>
             </div>
 
-            {/* Insumos (Empaques y Materia Prima de Inventario Of.) */}
+            {/* Materiales e Insumos (Stock bloqueado para edición directa) */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-              <h3 className="font-bold text-slate-800">
-                Insumos: Empaques y Materia Prima
-              </h3>
-
-              <form
-                onSubmit={handleAddSupply}
-                className="flex flex-wrap gap-3 items-end bg-slate-50 p-3.5 rounded-xl border border-slate-200"
-              >
-                <div className="flex-1 min-w-[200px]">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Detalle del Insumo
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newSupplyName}
-                    onChange={(e) => setNewSupplyName(e.target.value)}
-                    placeholder="Ej. Vasos de 12oz"
-                    className="w-full p-2 border rounded-lg bg-white text-sm"
-                  />
+              <div className="flex flex-wrap justify-between items-center gap-2">
+                <div>
+                  <h3 className="font-bold text-slate-800">
+                    Materiales e Insumos (Empaques y Materia Prima)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Stock protegido contra edición directa. Usa{" "}
+                    <strong>Actualizar inventario</strong> arriba para modificarlo.
+                  </p>
                 </div>
-                <div className="w-40">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Tipo
-                  </label>
-                  <select
-                    value={newSupplyType}
-                    onChange={(e) => setNewSupplyType(e.target.value)}
-                    className="w-full p-2 border rounded-lg bg-white text-sm"
-                  >
-                    <option value="Materia Prima">Materia Prima</option>
-                    <option value="Empaques">Empaques</option>
-                  </select>
-                </div>
-                <div className="w-28">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Disponible
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={newSupplyStock}
-                    onChange={(e) => setNewSupplyStock(e.target.value)}
-                    placeholder="100"
-                    className="w-full p-2 border rounded-lg bg-white text-sm"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1"
-                >
-                  <Plus size={16} /> Añadir Insumo
-                </button>
-              </form>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-1 rounded-full">
+                  <Lock size={13} /> Stock protegido
+                </span>
+              </div>
 
               <div className="overflow-x-auto max-h-96">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse text-sm">
                   <thead className="bg-slate-50 border-b text-xs uppercase text-slate-500 sticky top-0">
                     <tr>
                       <th className="p-3">Detalle</th>
@@ -1155,33 +1461,76 @@ export default function NegocioElCheleApp() {
                       <th className="p-3">Total disponible</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y text-sm">
+                  <tbody className="divide-y">
                     {supplies.map((sup) => (
                       <tr key={sup.id} className="hover:bg-slate-50">
                         <td className="p-3 font-medium">{sup.name}</td>
                         <td className="p-3 text-slate-600">{sup.type}</td>
-                        <td className="p-3">
-                          <input
-                            type="number"
-                            value={sup.stock}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value) || 0;
-                              setSupplies(
-                                supplies.map((item) =>
-                                  item.id === sup.id
-                                    ? { ...item, stock: val }
-                                    : item
-                                )
-                              );
-                            }}
-                            className="w-24 p-1.5 border rounded-lg font-bold"
-                          />
+                        <td className="p-3 font-extrabold text-slate-900">
+                          {sup.stock}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Historial de Actualizaciones de Inventario */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+              <h3 className="font-bold text-slate-800">
+                Historial de Actualizaciones de Inventario
+              </h3>
+
+              {inventoryLogs.length === 0 ? (
+                <p className="text-sm text-slate-400 py-4">
+                  Aún no hay actualizaciones registradas. Usa el botón{" "}
+                  <strong>Actualizar inventario</strong> para registrar una.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {inventoryLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2"
+                    >
+                      <div className="flex flex-wrap justify-between items-center gap-2 text-xs">
+                        <div className="flex items-center gap-2 font-bold text-slate-800">
+                          <Calendar size={14} className="text-blue-700" />
+                          <span>Fecha: {log.date}</span>
+                          <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 uppercase">
+                            {log.mode}
+                          </span>
+                        </div>
+                        <span className="text-slate-500">
+                          Registrado: {log.recordedAt}
+                        </span>
+                      </div>
+
+                      {log.note && (
+                        <p className="text-xs text-slate-600 italic">
+                          Nota: {log.note}
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {log.items.map((it, idx) => (
+                          <span
+                            key={`${log.id}-${idx}`}
+                            className="text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg font-medium"
+                          >
+                            <strong>{it.name}:</strong> {it.previousStock} →{" "}
+                            <span className="text-blue-800 font-bold">
+                              {it.newStock}
+                            </span>{" "}
+                            ({it.delta >= 0 ? `+${it.delta}` : it.delta})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1191,26 +1540,26 @@ export default function NegocioElCheleApp() {
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
               <div>
-                <h2 className="text-lg font-bold">Registro Ordenado de Ventas</h2>
+                <h2 className="text-lg font-bold">Historial de Ventas</h2>
                 <p className="text-2xl font-extrabold text-green-700 mt-1">
                   Total Vendido: ${totalSold.toFixed(2)}
                 </p>
               </div>
               <button
-                onClick={exportAllToExcel}
+                onClick={exportToExcel}
                 className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold"
               >
-                <Download size={17} /> Exportar a Excel
+                <Download size={17} /> Exportar Reporte Excel
               </button>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
               {sales.length === 0 ? (
                 <p className="text-center text-slate-400 py-10">
-                  Aún no se han registrado ventas.
+                  No hay ventas registradas todavía.
                 </p>
               ) : (
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse text-sm">
                   <thead className="bg-slate-50 border-b text-xs uppercase text-slate-500">
                     <tr>
                       <th className="p-4">Fecha y Hora</th>
@@ -1220,7 +1569,7 @@ export default function NegocioElCheleApp() {
                       <th className="p-4">Cambio</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y text-sm">
+                  <tbody className="divide-y">
                     {sales.map((sale) => (
                       <tr key={sale.id} className="hover:bg-slate-50">
                         <td className="p-4 text-slate-500 whitespace-nowrap">
@@ -1260,9 +1609,10 @@ export default function NegocioElCheleApp() {
               <div className="flex items-center gap-2.5">
                 <Wallet className="text-blue-800" size={24} />
                 <div>
-                  <h2 className="text-lg font-bold">Panel Financiero</h2>
+                  <h2 className="text-lg font-bold">Control Financiero</h2>
                   <p className="text-xs text-slate-500">
-                    Visible solo con contraseña del dueño
+                    Disponibilidad de pagos, fechas de Kat y Gab, deudas y
+                    reinversiones
                   </p>
                 </div>
               </div>
@@ -1274,174 +1624,382 @@ export default function NegocioElCheleApp() {
                 }}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
-                <EyeOff size={16} /> Bloquear Financiero
+                <EyeOff size={16} /> Bloquear
               </button>
             </div>
 
-            {/* Tarjetas Resumen */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Indicadores clave */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-2xl border border-slate-200">
                 <p className="text-xs font-bold uppercase text-slate-500">
-                  Meta
+                  Total Vendido
                 </p>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={financial.goal}
-                  onChange={(e) =>
-                    setFinancial({
-                      ...financial,
-                      goal: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className="mt-1 w-full text-xl font-extrabold text-blue-800 border-b border-dashed border-slate-300 focus:outline-none"
-                />
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-slate-200">
-                <p className="text-xs font-bold uppercase text-slate-500">
-                  Vendido
-                </p>
-                <p className="mt-1 text-xl font-extrabold text-green-700">
+                <p className="mt-1 text-2xl font-extrabold text-green-700">
                   ${totalSold.toFixed(2)}
                 </p>
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-slate-200">
                 <p className="text-xs font-bold uppercase text-slate-500">
-                  Deudas
-                </p>
-                <p className="mt-1 text-xl font-extrabold text-red-600">
-                  ${totalDebts.toFixed(2)}
-                </p>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-slate-200">
-                <p className="text-xs font-bold uppercase text-slate-500">
-                  Ganancia
+                  Efectivo Disponible para Pagar
                 </p>
                 <p
-                  className={`mt-1 text-xl font-extrabold ${
-                    netProfit >= 0 ? "text-emerald-700" : "text-red-600"
+                  className={`mt-1 text-2xl font-extrabold ${
+                    availableCash > 0 ? "text-emerald-700" : "text-slate-600"
                   }`}
                 >
-                  ${netProfit.toFixed(2)}
+                  ${availableCash.toFixed(2)}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {availableCash > 0
+                    ? "Hay dinero disponible para cubrir pagos"
+                    : "Aún no hay saldo disponible de ventas"}
                 </p>
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-slate-200">
                 <p className="text-xs font-bold uppercase text-slate-500">
-                  Reinversión
+                  Pendiente por Pagar
                 </p>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={financial.reinvestment}
-                  onChange={(e) =>
-                    setFinancial({
-                      ...financial,
-                      reinvestment: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className="mt-1 w-full text-xl font-extrabold text-slate-900 border-b border-dashed border-slate-300 focus:outline-none"
-                />
+                <p className="mt-1 text-2xl font-extrabold text-red-600">
+                  ${totalPendingObligations.toFixed(2)}
+                </p>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Ganancia - reinver.: ${profitMinusReinvest.toFixed(2)}
+                  Salarios: ${pendingEmployeePay.toFixed(2)} | Deudas: $
+                  {pendingOtherDebts.toFixed(2)}
+                </p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200">
+                <p className="text-xs font-bold uppercase text-slate-500">
+                  Reinversión Registrada
+                </p>
+                <p className="mt-1 text-2xl font-extrabold text-blue-800">
+                  ${totalReinvestments.toFixed(2)}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Meta: ${Number(financial.goal || 0).toFixed(2)}
                 </p>
               </div>
             </div>
 
-            {/* Compras y Pagos */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">
-              <h3 className="font-bold text-slate-800">
-                Compras por Tipo (Utensilios, Empaques, Materia Prima, Transporte)
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead className="bg-slate-50 border-b text-xs uppercase text-slate-500">
-                    <tr>
-                      <th className="p-3">Tipo</th>
-                      <th className="p-3">Utensilios</th>
-                      <th className="p-3">Empaques</th>
-                      <th className="p-3">Materia Prima</th>
-                      <th className="p-3">Transporte</th>
-                      <th className="p-3">Total</th>
-                      <th className="p-3">Pagado/abono</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {financial.purchasesSummary.map((row) => {
-                      const rowTotal =
-                        (parseFloat(row.utensils) || 0) +
-                        (parseFloat(row.packaging) || 0) +
-                        (parseFloat(row.rawMaterial) || 0) +
-                        (parseFloat(row.transport) || 0);
-                      return (
-                        <tr key={row.id}>
-                          <td className="p-3 font-semibold">{row.type}</td>
-                          <td className="p-3">
-                            ${(parseFloat(row.utensils) || 0).toFixed(2)}
-                          </td>
-                          <td className="p-3">
-                            ${(parseFloat(row.packaging) || 0).toFixed(2)}
-                          </td>
-                          <td className="p-3">
-                            ${(parseFloat(row.rawMaterial) || 0).toFixed(2)}
-                          </td>
-                          <td className="p-3">
-                            ${(parseFloat(row.transport) || 0).toFixed(2)}
-                          </td>
-                          <td className="p-3 font-bold">${rowTotal.toFixed(2)}</td>
-                          <td className="p-3 text-green-700 font-semibold">
-                            ${(parseFloat(row.paid) || 0).toFixed(2)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            {/* Fechas y Pagos de Kat y Gab */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Pagos y Fechas — Kat y Gab
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Inicio: <strong>Kat el 3 de diciembre</strong> y{" "}
+                  <strong>Gab el 4 de diciembre</strong>. Fechas de pago:{" "}
+                  <strong>15 de diciembre</strong> y{" "}
+                  <strong>30 de diciembre</strong>.
+                </p>
               </div>
-              <p className="text-xs text-slate-600 pt-1">
-                Total compras: <strong>${totalPurchases.toFixed(2)}</strong> |
-                Total abonado: <strong>${totalPaidPurchases.toFixed(2)}</strong> |
-                Diferencia: <strong>${pendingPurchases.toFixed(2)}</strong>
-              </p>
-            </div>
 
-            {/* Deudas */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">
-              <h3 className="font-bold text-slate-800">
-                Deudas y Compromisos (Total: ${totalDebts.toFixed(2)})
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                {financial.debts.map((debt) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {financial.employees.map((emp) => (
                   <div
-                    key={debt.id}
-                    className="p-3.5 rounded-xl border border-slate-200 bg-slate-50"
+                    key={emp.id}
+                    className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3"
                   >
-                    <p className="text-sm font-bold text-slate-800">
-                      {debt.concept}
-                    </p>
-                    {debt.note && (
-                      <p className="text-xs text-slate-500">{debt.note}</p>
-                    )}
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={debt.amount}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setFinancial({
-                          ...financial,
-                          debts: financial.debts.map((d) =>
-                            d.id === debt.id ? { ...d, amount: val } : d
-                          ),
-                        });
-                      }}
-                      className="mt-2 w-full p-1.5 bg-white border rounded-lg font-bold text-red-700 text-sm"
-                    />
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-bold text-slate-900 text-base">
+                        {emp.name}
+                      </h4>
+                      <span className="text-xs font-semibold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full">
+                        Inicia: {emp.startDate}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {emp.payDates.map((pd) => {
+                        const canCoverNow =
+                          !pd.paid && availableCash >= pd.amount;
+                        return (
+                          <div
+                            key={pd.id}
+                            className={`p-3 rounded-xl border flex flex-wrap justify-between items-center gap-2 ${
+                              pd.paid
+                                ? "bg-green-50 border-green-200"
+                                : canCoverNow
+                                ? "bg-emerald-50 border-emerald-300"
+                                : "bg-white border-slate-200"
+                            }`}
+                          >
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">
+                                {pd.label} — Fecha: {pd.dueDate}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                Monto: <strong>${pd.amount.toFixed(2)}</strong>
+                                {pd.note ? ` (${pd.note})` : ""}
+                                {pd.paid && pd.paidDate
+                                  ? ` · Pagado el ${pd.paidDate}`
+                                  : ""}
+                              </p>
+                              {!pd.paid && canCoverNow && (
+                                <p className="text-[11px] font-semibold text-emerald-700 mt-0.5">
+                                  ✓ Dinero disponible para pagar este monto
+                                </p>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                toggleEmployeePayment(emp.id, pd.id)
+                              }
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                                pd.paid
+                                  ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                                  : canCoverNow
+                                  ? "bg-green-600 text-white hover:bg-green-700"
+                                  : "bg-blue-700 text-white hover:bg-blue-800"
+                              }`}
+                            >
+                              {pd.paid ? "Marcar Pendiente" : "Registrar Pago"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Agregar nueva fecha de pago para Kat o Gab */}
+              <form
+                onSubmit={handleAddEmployeePayDate}
+                className="flex flex-wrap gap-3 items-end bg-slate-50 p-3.5 rounded-xl border border-slate-200"
+              >
+                <div className="w-36">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Empleada
+                  </label>
+                  <select
+                    value={extraPayEmpId}
+                    onChange={(e) => setExtraPayEmpId(e.target.value)}
+                    className="w-full p-2 border rounded-lg bg-white text-sm"
+                  >
+                    <option value="emp-kat">Kat</option>
+                    <option value="emp-gab">Gab</option>
+                  </select>
+                </div>
+
+                <div className="flex-1 min-w-[160px]">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Concepto de pago
+                  </label>
+                  <input
+                    type="text"
+                    value={extraPayLabel}
+                    onChange={(e) => setExtraPayLabel(e.target.value)}
+                    className="w-full p-2 border rounded-lg bg-white text-sm"
+                  />
+                </div>
+
+                <div className="w-40">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Fecha de pago
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={extraPayDate}
+                    onChange={(e) => setExtraPayDate(e.target.value)}
+                    className="w-full p-2 border rounded-lg bg-white text-sm"
+                  />
+                </div>
+
+                <div className="w-32">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Monto ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={extraPayAmount}
+                    onChange={(e) => setExtraPayAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full p-2 border rounded-lg bg-white text-sm"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1"
+                >
+                  <Plus size={16} /> Agregar Fecha
+                </button>
+              </form>
+            </div>
+
+            {/* Deudas y Reinversiones */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Deudas */}
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <h3 className="font-bold text-slate-900">
+                  Deudas y Compromisos
+                </h3>
+
+                <form
+                  onSubmit={handleAddDebt}
+                  className="flex flex-wrap gap-2 items-end bg-slate-50 p-3 rounded-xl border border-slate-200"
+                >
+                  <input
+                    type="text"
+                    required
+                    placeholder="Concepto de deuda"
+                    value={newDebtConcept}
+                    onChange={(e) => setNewDebtConcept(e.target.value)}
+                    className="flex-1 min-w-[140px] p-2 border rounded-lg bg-white text-sm"
+                  />
+                  <input
+                    type="date"
+                    value={newDebtDate}
+                    onChange={(e) => setNewDebtDate(e.target.value)}
+                    className="p-2 border rounded-lg bg-white text-sm"
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    placeholder="Monto ($)"
+                    value={newDebtAmount}
+                    onChange={(e) => setNewDebtAmount(e.target.value)}
+                    className="w-28 p-2 border rounded-lg bg-white text-sm"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 rounded-lg text-sm font-semibold"
+                  >
+                    Registrar
+                  </button>
+                </form>
+
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {financial.otherDebts.map((debt) => {
+                    const canPayDebt =
+                      !debt.paid && availableCash >= debt.amount && debt.amount > 0;
+                    return (
+                      <div
+                        key={debt.id}
+                        className="p-3 rounded-xl border border-slate-200 flex justify-between items-center gap-2 text-sm"
+                      >
+                        <div>
+                          <p className="font-bold text-slate-800">
+                            {debt.concept}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Fecha: {debt.date || "Sin fecha"} ·{" "}
+                            <strong className="text-slate-800">
+                              ${Number(debt.amount).toFixed(2)}
+                            </strong>
+                          </p>
+                          {canPayDebt && (
+                            <p className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1 mt-0.5">
+                              <AlertCircle size={12} /> Hay fondos disponibles
+                              para pagar
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleDebtPaid(debt.id)}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold ${
+                            debt.paid
+                              ? "bg-green-100 text-green-800"
+                              : "bg-slate-800 text-white hover:bg-slate-900"
+                          }`}
+                        >
+                          {debt.paid ? "Pagada" : "Marcar Pagada"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Reinversiones */}
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <h3 className="font-bold text-slate-900">
+                  Registro de Reinversiones
+                </h3>
+
+                <form
+                  onSubmit={handleAddReinvestment}
+                  className="flex flex-wrap gap-2 items-end bg-slate-50 p-3 rounded-xl border border-slate-200"
+                >
+                  <input
+                    type="text"
+                    required
+                    placeholder="Detalle de reinversión"
+                    value={newReinvConcept}
+                    onChange={(e) => setNewReinvConcept(e.target.value)}
+                    className="flex-1 min-w-[140px] p-2 border rounded-lg bg-white text-sm"
+                  />
+                  <select
+                    value={newReinvCategory}
+                    onChange={(e) => setNewReinvCategory(e.target.value)}
+                    className="p-2 border rounded-lg bg-white text-sm"
+                  >
+                    <option value="Minutas">Minutas</option>
+                    <option value="Licuados">Licuados</option>
+                    <option value="Bebidas">Bebidas</option>
+                    <option value="General">General</option>
+                  </select>
+                  <input
+                    type="date"
+                    value={newReinvDate}
+                    onChange={(e) => setNewReinvDate(e.target.value)}
+                    className="p-2 border rounded-lg bg-white text-sm"
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    placeholder="Monto ($)"
+                    value={newReinvAmount}
+                    onChange={(e) => setNewReinvAmount(e.target.value)}
+                    className="w-28 p-2 border rounded-lg bg-white text-sm"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-blue-700 hover:bg-blue-800 text-white px-3.5 py-2 rounded-lg text-sm font-semibold"
+                  >
+                    Guardar
+                  </button>
+                </form>
+
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {financial.reinvestments.length === 0 ? (
+                    <p className="text-xs text-slate-400 py-6 text-center">
+                      No hay reinversiones registradas todavía.
+                    </p>
+                  ) : (
+                    financial.reinvestments.map((reinv) => (
+                      <div
+                        key={reinv.id}
+                        className="p-3 rounded-xl border border-slate-200 flex justify-between items-center text-sm"
+                      >
+                        <div>
+                          <p className="font-bold text-slate-800">
+                            {reinv.concept}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {reinv.category} · Fecha: {reinv.date}
+                          </p>
+                        </div>
+                        <span className="font-extrabold text-blue-800">
+                          ${Number(reinv.amount).toFixed(2)}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           </div>
