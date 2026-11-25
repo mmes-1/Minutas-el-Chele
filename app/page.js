@@ -34,6 +34,15 @@ const OWNER_PASSWORD = "Negocio2026";
 
 const BASE_CATEGORIES = ["Minutas", "Licuados"];
 
+const DEBT_TYPES = [
+  "Préstamo",
+  "Interés",
+  "Tarjeta / Plazo",
+  "Proveedor",
+  "Servicio",
+  "Otro",
+];
+
 const INITIAL_MENU = [
   {
     id: 1,
@@ -227,6 +236,7 @@ const INITIAL_FINANCIAL = {
   otherDebts: [
     {
       id: "d-prestamo",
+      type: "Préstamo",
       concept: "Prestamo",
       amount: 1000.0,
       date: "2026-12-03",
@@ -234,6 +244,7 @@ const INITIAL_FINANCIAL = {
     },
     {
       id: "d-intereses",
+      type: "Interés",
       concept: "Intereses",
       amount: 200.0,
       date: "2026-12-15",
@@ -241,6 +252,7 @@ const INITIAL_FINANCIAL = {
     },
     {
       id: "d-tarjeta",
+      type: "Tarjeta / Plazo",
       concept: "Plazo/tarjeta",
       amount: 696.9,
       date: "2026-12-30",
@@ -248,6 +260,7 @@ const INITIAL_FINANCIAL = {
     },
     {
       id: "d-ever",
+      type: "Proveedor",
       concept: "Contado Ever",
       amount: 0.0,
       date: "2026-12-03",
@@ -443,20 +456,23 @@ export default function NegocioElCheleApp() {
   const [newSelectedSupplyId, setNewSelectedSupplyId] = useState("");
   const [newSelectedSupplyQty, setNewSelectedSupplyQty] = useState("1");
 
-  // Nuevos registros financieros
+  // Nuevos registros financieros (con Tipo)
+  const [newDebtType, setNewDebtType] = useState("Préstamo");
   const [newDebtConcept, setNewDebtConcept] = useState("");
   const [newDebtAmount, setNewDebtAmount] = useState("");
   const [newDebtDate, setNewDebtDate] = useState("2026-12-15");
+
+  // Modal para editar un pago programado / deuda existente
+  const [editingDebt, setEditingDebt] = useState(null);
+  const [editDebtType, setEditDebtType] = useState("Préstamo");
+  const [editDebtConcept, setEditDebtConcept] = useState("");
+  const [editDebtAmount, setEditDebtAmount] = useState("");
+  const [editDebtDate, setEditDebtDate] = useState("2026-12-15");
 
   const [newReinvConcept, setNewReinvConcept] = useState("");
   const [newReinvCategory, setNewReinvCategory] = useState("Minutas");
   const [newReinvAmount, setNewReinvAmount] = useState("");
   const [newReinvDate, setNewReinvDate] = useState("2026-12-04");
-
-  const [extraPayEmpId, setExtraPayEmpId] = useState("emp-kat");
-  const [extraPayLabel, setExtraPayLabel] = useState("Pago adicional");
-  const [extraPayDate, setExtraPayDate] = useState("2026-12-15");
-  const [extraPayAmount, setExtraPayAmount] = useState("");
 
   useEffect(() => {
     const savedProducts = localStorage.getItem("chele_v7_products");
@@ -472,7 +488,6 @@ export default function NegocioElCheleApp() {
       ? JSON.parse(savedProducts)
       : INITIAL_MENU;
 
-    // Asegura que Ceviminuta siempre exista si fue borrada por accidente
     if (!loadedProducts.some((p) => p.id === 1 || p.name === "Ceviminuta")) {
       loadedProducts = [INITIAL_MENU[0], ...loadedProducts];
     }
@@ -480,16 +495,31 @@ export default function NegocioElCheleApp() {
     const parsedSales = savedSales ? JSON.parse(savedSales) : [];
     const normalizedSales = parsedSales.map((s, idx) => ({
       ...s,
-      saleTxId: s.saleTxId || `TRX-${String(parsedSales.length - idx).padStart(4, "0")}`,
+      saleTxId:
+        s.saleTxId ||
+        `TRX-${String(parsedSales.length - idx).padStart(4, "0")}`,
     }));
 
     setSupplies(loadedSupplies);
     setProducts(syncProductsWithSharedSupplies(loadedProducts, loadedSupplies));
     setInventoryLogs(savedInvLogs ? JSON.parse(savedInvLogs) : []);
     setSales(normalizedSales);
-    setFinancial(
-      savedFinancial ? JSON.parse(savedFinancial) : INITIAL_FINANCIAL
-    );
+
+    if (savedFinancial) {
+      const parsedFin = JSON.parse(savedFinancial);
+      setFinancial({
+        ...INITIAL_FINANCIAL,
+        ...parsedFin,
+        otherDebts: Array.isArray(parsedFin.otherDebts)
+          ? parsedFin.otherDebts.map((d) => ({
+              type: d.type || "Otro",
+              ...d,
+            }))
+          : INITIAL_FINANCIAL.otherDebts,
+      });
+    } else {
+      setFinancial(INITIAL_FINANCIAL);
+    }
 
     if (loadedSupplies.length > 0) {
       setNewSelectedSupplyId((prev) => prev || loadedSupplies[0].id);
@@ -521,13 +551,21 @@ export default function NegocioElCheleApp() {
     localStorage.setItem("chele_v7_financial", JSON.stringify(financial));
   }, [financial]);
 
-  // --- CATEGORÍAS DISPONIBLES (BASE + ESCRITAS POR EL USUARIO) ---
   const availableCategories = Array.from(
     new Set([
       ...BASE_CATEGORIES,
       ...products
         .map((p) => (p.category || "").trim())
         .filter((cat) => cat.length > 0),
+    ])
+  );
+
+  const availableDebtTypes = Array.from(
+    new Set([
+      ...DEBT_TYPES,
+      ...(financial.otherDebts || [])
+        .map((d) => (d.type || "").trim())
+        .filter((t) => t.length > 0),
     ])
   );
 
@@ -1193,7 +1231,8 @@ export default function NegocioElCheleApp() {
         return match ? parseInt(match[1], 10) : 0;
       })
       .filter((n) => !Number.isNaN(n));
-    const maxNum = existingNums.length > 0 ? Math.max(...existingNums) : sales.length;
+    const maxNum =
+      existingNums.length > 0 ? Math.max(...existingNums) : sales.length;
     return `TRX-${String(maxNum + 1).padStart(4, "0")}`;
   };
 
@@ -1384,37 +1423,6 @@ export default function NegocioElCheleApp() {
     });
   };
 
-  const handleAddEmployeePayDate = (e) => {
-    e.preventDefault();
-    const amt = parseFloat(extraPayAmount);
-    if (!extraPayLabel.trim() || Number.isNaN(amt) || amt <= 0) return;
-
-    setFinancial({
-      ...financial,
-      employees: financial.employees.map((emp) =>
-        emp.id === extraPayEmpId
-          ? {
-              ...emp,
-              payDates: [
-                ...emp.payDates,
-                {
-                  id: `pay-${Date.now()}`,
-                  label: extraPayLabel.trim(),
-                  dueDate: extraPayDate,
-                  amount: amt,
-                  note: "Fecha registrada",
-                  paid: false,
-                  paidDate: "",
-                },
-              ],
-            }
-          : emp
-      ),
-    });
-    setExtraPayLabel("Pago adicional");
-    setExtraPayAmount("");
-  };
-
   const handleAddDebt = (e) => {
     e.preventDefault();
     const amt = parseFloat(newDebtAmount);
@@ -1426,6 +1434,7 @@ export default function NegocioElCheleApp() {
         ...financial.otherDebts,
         {
           id: `debt-${Date.now()}`,
+          type: (newDebtType || "Otro").trim(),
           concept: newDebtConcept.trim(),
           amount: amt,
           date: newDebtDate,
@@ -1435,6 +1444,49 @@ export default function NegocioElCheleApp() {
     });
     setNewDebtConcept("");
     setNewDebtAmount("");
+  };
+
+  const openEditDebtModal = (debtObj) => {
+    setEditingDebt(debtObj);
+    setEditDebtType(debtObj.type || "Otro");
+    setEditDebtConcept(debtObj.concept || "");
+    setEditDebtAmount(String(debtObj.amount ?? ""));
+    setEditDebtDate(debtObj.date || "2026-12-15");
+  };
+
+  const handleSaveEditedDebt = (e) => {
+    e.preventDefault();
+    if (!editingDebt || !editDebtConcept.trim()) return;
+    const amt = parseFloat(editDebtAmount);
+    if (Number.isNaN(amt) || amt < 0) return;
+
+    setFinancial({
+      ...financial,
+      otherDebts: financial.otherDebts.map((d) =>
+        d.id === editingDebt.id
+          ? {
+              ...d,
+              type: (editDebtType || "Otro").trim(),
+              concept: editDebtConcept.trim(),
+              amount: amt,
+              date: editDebtDate,
+            }
+          : d
+      ),
+    });
+    setEditingDebt(null);
+  };
+
+  const handleDeleteDebt = (debtObj) => {
+    const confirmed = window.confirm(
+      `¿Eliminar "${debtObj.concept}" (${debtObj.type || "Otro"}) de Otros Pagos Programados y Deudas?`
+    );
+    if (!confirmed) return;
+
+    setFinancial({
+      ...financial,
+      otherDebts: financial.otherDebts.filter((d) => d.id !== debtObj.id),
+    });
   };
 
   const toggleDebtPaid = (debtId) => {
@@ -1546,6 +1598,20 @@ export default function NegocioElCheleApp() {
       "Ventas"
     );
 
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.json_to_sheet(
+        financial.otherDebts.map((d) => ({
+          Tipo: d.type || "Otro",
+          Concepto: d.concept,
+          Fecha: d.date,
+          Monto: Number((parseFloat(d.amount) || 0).toFixed(2)),
+          Estado: d.paid ? "Pagada" : "Pendiente",
+        }))
+      ),
+      "Pagos_Programados"
+    );
+
     XLSX.writeFile(wb, "Minutas_el_Chele_Completo.xlsx");
   };
 
@@ -1592,7 +1658,6 @@ export default function NegocioElCheleApp() {
   const totalPaymentsMade = paidEmployeePay + paidOtherDebts;
   const totalPendingDebtsAndSalaries = pendingEmployeePay + pendingOtherDebts;
 
-  // Lista consolidada y ordenada de todos los pagos programados pendientes (Salarios + Deudas/Compromisos)
   const scheduledPendingPayments = [
     ...financial.employees.flatMap((emp) =>
       emp.payDates
@@ -1611,7 +1676,7 @@ export default function NegocioElCheleApp() {
       .filter((d) => !d.paid && (parseFloat(d.amount) || 0) > 0)
       .map((d) => ({
         uid: `debt-${d.id}`,
-        kind: "Deuda / Compromiso",
+        kind: d.type || "Otro",
         title: d.concept,
         subtitle: "Pago programado",
         dueDate: d.date || "9999-12-31",
@@ -1653,12 +1718,120 @@ export default function NegocioElCheleApp() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 text-slate-800">
-      {/* LISTA DE CATEGORÍAS EXISTENTES PARA AUTOCOMPLETAR O ESCRIBIR */}
       <datalist id="categorias-existentes">
         {availableCategories.map((cat) => (
           <option key={cat} value={cat} />
         ))}
       </datalist>
+
+      <datalist id="tipos-deuda-existentes">
+        {availableDebtTypes.map((tp) => (
+          <option key={tp} value={tp} />
+        ))}
+      </datalist>
+
+      {/* MODAL PARA EDITAR PAGO PROGRAMADO / DEUDA */}
+      {editingDebt && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSaveEditedDebt}
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4"
+          >
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Editar Pago Programado / Deuda
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Modifica el tipo, concepto, fecha o monto
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingDebt(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                  Tipo
+                </label>
+                <input
+                  type="text"
+                  required
+                  list="tipos-deuda-existentes"
+                  value={editDebtType}
+                  onChange={(e) => setEditDebtType(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                  Concepto
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editDebtConcept}
+                  onChange={(e) => setEditDebtConcept(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm font-semibold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                    Fecha
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editDebtDate}
+                    onChange={(e) => setEditDebtDate(e.target.value)}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
+                    Monto ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={editDebtAmount}
+                    onChange={(e) => setEditDebtAmount(e.target.value)}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm font-bold text-right"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingDebt(null)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-medium hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-blue-800 hover:bg-blue-900 text-white text-sm font-bold"
+              >
+                Guardar Cambios
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* MODAL DE CONTRASEÑA */}
       {pendingAction && (
@@ -2147,7 +2320,10 @@ export default function NegocioElCheleApp() {
                     className="w-20 p-1.5 border border-slate-300 rounded-lg bg-white text-right font-bold"
                   />
                   <div className="w-20 text-right font-bold text-sm text-slate-900">
-                    ${(Number(it.price) * (parseInt(it.qty, 10) || 0)).toFixed(2)}
+                    $
+                    {(
+                      Number(it.price) * (parseInt(it.qty, 10) || 0)
+                    ).toFixed(2)}
                   </div>
                 </div>
               ))}
@@ -2212,7 +2388,10 @@ export default function NegocioElCheleApp() {
               <div className="flex justify-between items-center text-sm px-1">
                 <span className="text-slate-600 font-medium">Cambio:</span>
                 <span className="font-extrabold text-green-700">
-                  ${editedChangeAmount > 0 ? editedChangeAmount.toFixed(2) : "0.00"}
+                  $
+                  {editedChangeAmount > 0
+                    ? editedChangeAmount.toFixed(2)
+                    : "0.00"}
                 </span>
               </div>
             )}
@@ -3047,7 +3226,7 @@ export default function NegocioElCheleApp() {
               </div>
             </div>
 
-            {/* Materiales e Insumos (Crear, Listar y Eliminar) */}
+            {/* Materiales e Insumos */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
               <div className="flex flex-wrap justify-between items-center gap-2">
                 <div>
@@ -3207,7 +3386,7 @@ export default function NegocioElCheleApp() {
           </div>
         )}
 
-        {/* 3. HISTORIAL DE VENTAS CON ID TRANSACCIÓN, OBSERVACIONES (FOCO) Y VALIDACIÓN */}
+        {/* 3. HISTORIAL DE VENTAS */}
         {activeTab === "history" && (
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
@@ -3428,7 +3607,7 @@ export default function NegocioElCheleApp() {
           </div>
         )}
 
-        {/* 4. FINANCIERO (PROTEGIDO CON CONTRASEÑA) */}
+        {/* 4. FINANCIERO */}
         {activeTab === "financial" && financialUnlocked && (
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
@@ -3610,7 +3789,7 @@ export default function NegocioElCheleApp() {
               </div>
             </div>
 
-            {/* CALENDARIO DE PAGOS PROGRAMADOS PENDIENTES (SALARIOS + DEUDAS) */}
+            {/* CALENDARIO DE PAGOS PROGRAMADOS PENDIENTES */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
               <div className="flex flex-wrap justify-between items-center gap-2">
                 <div className="flex items-center gap-2">
@@ -3724,7 +3903,7 @@ export default function NegocioElCheleApp() {
               )}
             </div>
 
-            {/* Fechas y Pagos de Salarios — Kat y Gab */}
+            {/* Fechas y Pagos de Salarios — Kat y Gab (sin el formulario eliminado) */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
@@ -3808,75 +3987,9 @@ export default function NegocioElCheleApp() {
                   </div>
                 ))}
               </div>
-
-              <form
-                onSubmit={handleAddEmployeePayDate}
-                className="flex flex-wrap gap-3 items-end bg-slate-50 p-3.5 rounded-xl border border-slate-200"
-              >
-                <div className="w-36">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Empleada
-                  </label>
-                  <select
-                    value={extraPayEmpId}
-                    onChange={(e) => setExtraPayEmpId(e.target.value)}
-                    className="w-full p-2 border rounded-lg bg-white text-sm"
-                  >
-                    <option value="emp-kat">Kat</option>
-                    <option value="emp-gab">Gab</option>
-                  </select>
-                </div>
-
-                <div className="flex-1 min-w-[160px]">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Concepto de pago
-                  </label>
-                  <input
-                    type="text"
-                    value={extraPayLabel}
-                    onChange={(e) => setExtraPayLabel(e.target.value)}
-                    className="w-full p-2 border rounded-lg bg-white text-sm"
-                  />
-                </div>
-
-                <div className="w-40">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Fecha de pago
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={extraPayDate}
-                    onChange={(e) => setExtraPayDate(e.target.value)}
-                    className="w-full p-2 border rounded-lg bg-white text-sm"
-                  />
-                </div>
-
-                <div className="w-32">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Monto ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={extraPayAmount}
-                    onChange={(e) => setExtraPayAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full p-2 border rounded-lg bg-white text-sm"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1"
-                >
-                  <Plus size={16} /> Programar Salario
-                </button>
-              </form>
             </div>
 
-            {/* Deudas y Reinversiones */}
+            {/* Deudas (con Tipo, Editar y Eliminar) y Reinversiones */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
                 <div>
@@ -3884,7 +3997,8 @@ export default function NegocioElCheleApp() {
                     Otros Pagos Programados y Deudas
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Registra pagos futuros con su fecha programada y monto
+                    Registra, edita o elimina pagos futuros indicando el tipo,
+                    concepto, fecha y monto
                   </p>
                 </div>
 
@@ -3895,10 +4009,19 @@ export default function NegocioElCheleApp() {
                   <input
                     type="text"
                     required
+                    list="tipos-deuda-existentes"
+                    placeholder="Tipo (Préstamo, Interés...)"
+                    value={newDebtType}
+                    onChange={(e) => setNewDebtType(e.target.value)}
+                    className="w-36 p-2 border rounded-lg bg-white text-sm font-semibold"
+                  />
+                  <input
+                    type="text"
+                    required
                     placeholder="Concepto del pago"
                     value={newDebtConcept}
                     onChange={(e) => setNewDebtConcept(e.target.value)}
-                    className="flex-1 min-w-[140px] p-2 border rounded-lg bg-white text-sm"
+                    className="flex-1 min-w-[130px] p-2 border rounded-lg bg-white text-sm"
                   />
                   <input
                     type="date"
@@ -3933,13 +4056,18 @@ export default function NegocioElCheleApp() {
                     return (
                       <div
                         key={debt.id}
-                        className="p-3 rounded-xl border border-slate-200 flex justify-between items-center gap-2 text-sm"
+                        className="p-3 rounded-xl border border-slate-200 flex flex-wrap justify-between items-center gap-2 text-sm"
                       >
                         <div>
-                          <p className="font-bold text-slate-800">
-                            {debt.concept}
-                          </p>
-                          <p className="text-xs text-slate-500">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                              {debt.type || "Otro"}
+                            </span>
+                            <p className="font-bold text-slate-800">
+                              {debt.concept}
+                            </p>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
                             Fecha: {debt.date || "Sin fecha"} ·{" "}
                             <strong className="text-slate-800">
                               ${Number(debt.amount).toFixed(2)}
@@ -3953,17 +4081,33 @@ export default function NegocioElCheleApp() {
                           )}
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => toggleDebtPaid(debt.id)}
-                          className={`px-3 py-1 rounded-lg text-xs font-bold ${
-                            debt.paid
-                              ? "bg-green-100 text-green-800"
-                              : "bg-slate-800 text-white hover:bg-slate-900"
-                          }`}
-                        >
-                          {debt.paid ? "Pagada" : "Marcar Pagada"}
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openEditDebtModal(debt)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                          >
+                            <Pencil size={12} /> Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDebt(debt)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-red-200 bg-red-50 text-xs font-bold text-red-700 hover:bg-red-100"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleDebtPaid(debt.id)}
+                            className={`px-3 py-1 rounded-lg text-xs font-bold ${
+                              debt.paid
+                                ? "bg-green-100 text-green-800"
+                                : "bg-slate-800 text-white hover:bg-slate-900"
+                            }`}
+                          >
+                            {debt.paid ? "Pagada" : "Marcar Pagada"}
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
