@@ -25,6 +25,9 @@ import {
   Pencil,
   X,
   Layers,
+  Lightbulb,
+  Check,
+  Clock,
 } from "lucide-react";
 
 const OWNER_PASSWORD = "Negocio2026";
@@ -254,6 +257,11 @@ const INITIAL_FINANCIAL = {
   reinvestments: [],
 };
 
+function formatSaleTxId(sale, fallbackNumber) {
+  if (sale.saleTxId) return sale.saleTxId;
+  return `TRX-${String(fallbackNumber).padStart(4, "0")}`;
+}
+
 function syncProductsWithSharedSupplies(prodList, supList) {
   const traySup = supList.find((s) => s.id === "s3");
   const licuadoCupSup = supList.find((s) => s.id === "s1");
@@ -375,7 +383,7 @@ export default function NegocioElCheleApp() {
   const [transactionCode, setTransactionCode] = useState("");
   const [saleSuccess, setSaleSuccess] = useState(false);
 
-  // Contraseñas: Precio/Stock, Financiero y Modificar/Eliminar Ventas
+  // Contraseñas: Modificar/Eliminar Inventario, Financiero y Modificar/Eliminar/Aprobar Ventas
   const [priceAndStockUnlocked, setPriceAndStockUnlocked] = useState(false);
   const [financialUnlocked, setFinancialUnlocked] = useState(false);
   const [salesEditUnlocked, setSalesEditUnlocked] = useState(false);
@@ -384,6 +392,14 @@ export default function NegocioElCheleApp() {
   const [pendingAction, setPendingAction] = useState(null);
   const [salePendingAction, setSalePendingAction] = useState(null);
   const [productPendingEdit, setProductPendingEdit] = useState(null);
+  const [supplyPendingDelete, setSupplyPendingDelete] = useState(null);
+  const [productPendingDelete, setProductPendingDelete] = useState(null);
+
+  // Observaciones de vendedor en historial de ventas + validación del dueño
+  const [obsSaleTarget, setObsSaleTarget] = useState(null);
+  const [obsTextInput, setObsTextInput] = useState("");
+  const [reviewObsSaleTarget, setReviewObsSaleTarget] = useState(null);
+  const [reviewObsTextInput, setReviewObsTextInput] = useState("");
 
   // Modal para editar producto del menú y sus insumos vinculados
   const [editingProduct, setEditingProduct] = useState(null);
@@ -452,14 +468,25 @@ export default function NegocioElCheleApp() {
     const loadedSupplies = savedSupplies
       ? JSON.parse(savedSupplies)
       : INITIAL_SUPPLIES;
-    const loadedProducts = savedProducts
+    let loadedProducts = savedProducts
       ? JSON.parse(savedProducts)
       : INITIAL_MENU;
+
+    // Asegura que Ceviminuta siempre exista si fue borrada por accidente
+    if (!loadedProducts.some((p) => p.id === 1 || p.name === "Ceviminuta")) {
+      loadedProducts = [INITIAL_MENU[0], ...loadedProducts];
+    }
+
+    const parsedSales = savedSales ? JSON.parse(savedSales) : [];
+    const normalizedSales = parsedSales.map((s, idx) => ({
+      ...s,
+      saleTxId: s.saleTxId || `TRX-${String(parsedSales.length - idx).padStart(4, "0")}`,
+    }));
 
     setSupplies(loadedSupplies);
     setProducts(syncProductsWithSharedSupplies(loadedProducts, loadedSupplies));
     setInventoryLogs(savedInvLogs ? JSON.parse(savedInvLogs) : []);
-    setSales(savedSales ? JSON.parse(savedSales) : []);
+    setSales(normalizedSales);
     setFinancial(
       savedFinancial ? JSON.parse(savedFinancial) : INITIAL_FINANCIAL
     );
@@ -505,13 +532,36 @@ export default function NegocioElCheleApp() {
   );
 
   // --- CONTRASEÑA ---
+  const clearPendingState = () => {
+    setPendingAction(null);
+    setSalePendingAction(null);
+    setProductPendingEdit(null);
+    setSupplyPendingDelete(null);
+    setProductPendingDelete(null);
+    setPasswordInput("");
+    setPasswordError("");
+  };
+
   const openPasswordModal = (target, payloadObj = null) => {
     setPasswordInput("");
     setPasswordError("");
     setPendingAction(target);
+    setSalePendingAction(null);
+    setProductPendingEdit(null);
+    setSupplyPendingDelete(null);
+    setProductPendingDelete(null);
+
     if (target === "editProduct") {
       setProductPendingEdit(payloadObj);
-    } else {
+    } else if (target === "deleteProduct") {
+      setProductPendingDelete(payloadObj);
+    } else if (target === "deleteSupply") {
+      setSupplyPendingDelete(payloadObj);
+    } else if (
+      target === "editSale" ||
+      target === "deleteSale" ||
+      target === "reviewObservation"
+    ) {
       setSalePendingAction(payloadObj);
     }
   };
@@ -524,6 +574,11 @@ export default function NegocioElCheleApp() {
       saleObj.paymentMethod === "Efectivo" ? String(saleObj.cashGiven ?? "") : ""
     );
     setEditSaleTxCode(saleObj.transactionCode || "");
+  };
+
+  const openReviewObservationDirectly = (saleObj) => {
+    setReviewObsSaleTarget(saleObj);
+    setReviewObsTextInput(saleObj.observation || "");
   };
 
   const openProductEditorDirectly = (prodObj) => {
@@ -540,9 +595,42 @@ export default function NegocioElCheleApp() {
     setEditSelectedSupplyQty("1");
   };
 
+  const executeDeleteProduct = (prodObj) => {
+    const confirmed = window.confirm(
+      `¿Eliminar el producto "${prodObj.name}" del menú?`
+    );
+    if (!confirmed) return;
+    setProducts(products.filter((p) => p.id !== prodObj.id));
+  };
+
+  const executeDeleteSupply = (supObj) => {
+    const confirmed = window.confirm(
+      `¿Eliminar el insumo "${supObj.name}" del inventario? También se quitará de las recetas de productos.`
+    );
+    if (!confirmed) return;
+
+    const nextSupplies = supplies.filter((s) => s.id !== supObj.id);
+    const nextProducts = products.map((p) => ({
+      ...p,
+      recipe: Array.isArray(p.recipe)
+        ? p.recipe.filter((r) => r.supplyId !== supObj.id)
+        : [],
+    }));
+
+    setSupplies(nextSupplies);
+    setProducts(syncProductsWithSharedSupplies(nextProducts, nextSupplies));
+
+    if (newSelectedSupplyId === supObj.id) {
+      setNewSelectedSupplyId(nextSupplies[0]?.id || "");
+    }
+    if (editSelectedSupplyId === supObj.id) {
+      setEditSelectedSupplyId(nextSupplies[0]?.id || "");
+    }
+  };
+
   const deleteSaleAndRestoreStock = (saleObj) => {
     const confirmed = window.confirm(
-      `¿Eliminar la venta del ${saleObj.date} por $${Number(
+      `¿Eliminar la venta ${saleObj.saleTxId || ""} del ${saleObj.date} por $${Number(
         saleObj.total
       ).toFixed(2)} y devolver su stock?`
     );
@@ -587,38 +675,117 @@ export default function NegocioElCheleApp() {
     if (passwordInput === OWNER_PASSWORD) {
       if (pendingAction === "priceAndStock") {
         setPriceAndStockUnlocked(true);
+        clearPendingState();
       } else if (pendingAction === "editProduct") {
         setPriceAndStockUnlocked(true);
-        if (productPendingEdit) {
-          openProductEditorDirectly(productPendingEdit);
+        const targetProd = productPendingEdit;
+        clearPendingState();
+        if (targetProd) {
+          openProductEditorDirectly(targetProd);
+        }
+      } else if (pendingAction === "deleteProduct") {
+        setPriceAndStockUnlocked(true);
+        const targetProd = productPendingDelete;
+        clearPendingState();
+        if (targetProd) {
+          executeDeleteProduct(targetProd);
+        }
+      } else if (pendingAction === "deleteSupply") {
+        setPriceAndStockUnlocked(true);
+        const targetSup = supplyPendingDelete;
+        clearPendingState();
+        if (targetSup) {
+          executeDeleteSupply(targetSup);
         }
       } else if (pendingAction === "financial") {
         setFinancialUnlocked(true);
         setActiveTab("financial");
+        clearPendingState();
       } else if (pendingAction === "editSale") {
         setSalesEditUnlocked(true);
-        if (salePendingAction) {
-          openSaleEditorDirectly(salePendingAction);
+        const targetSale = salePendingAction;
+        clearPendingState();
+        if (targetSale) {
+          openSaleEditorDirectly(targetSale);
         }
       } else if (pendingAction === "deleteSale") {
         setSalesEditUnlocked(true);
         const targetSale = salePendingAction;
-        setPendingAction(null);
-        setSalePendingAction(null);
-        setPasswordInput("");
-        setPasswordError("");
+        clearPendingState();
         if (targetSale) {
           deleteSaleAndRestoreStock(targetSale);
         }
-        return;
+      } else if (pendingAction === "reviewObservation") {
+        setSalesEditUnlocked(true);
+        const targetSale = salePendingAction;
+        clearPendingState();
+        if (targetSale) {
+          openReviewObservationDirectly(targetSale);
+        }
       }
-      setPendingAction(null);
-      setSalePendingAction(null);
-      setProductPendingEdit(null);
-      setPasswordInput("");
-      setPasswordError("");
     } else {
       setPasswordError("Contraseña incorrecta. Ingresa Negocio2026.");
+    }
+  };
+
+  // --- OBSERVACIONES DEL VENDEDOR Y VALIDACIÓN DEL DUEÑO ---
+  const openSellerObservationModal = (saleObj) => {
+    setObsSaleTarget(saleObj);
+    setObsTextInput(saleObj.observation || "");
+  };
+
+  const handleSaveSellerObservation = (e) => {
+    e.preventDefault();
+    if (!obsSaleTarget) return;
+    const trimmed = obsTextInput.trim();
+    if (!trimmed) {
+      alert("Escribe una observación antes de guardar.");
+      return;
+    }
+
+    setSales(
+      sales.map((s) =>
+        s.id === obsSaleTarget.id
+          ? {
+              ...s,
+              observation: trimmed,
+              observationStatus: "pending",
+              observationCreatedAt: new Date().toLocaleString("es-SV"),
+            }
+          : s
+      )
+    );
+    setObsSaleTarget(null);
+    setObsTextInput("");
+  };
+
+  const handleRequestReviewObservation = (saleObj) => {
+    if (!salesEditUnlocked) {
+      openPasswordModal("reviewObservation", saleObj);
+      return;
+    }
+    openReviewObservationDirectly(saleObj);
+  };
+
+  const handleApproveAndResolveObservation = (e, openSaleEditAfter = false) => {
+    e.preventDefault();
+    if (!reviewObsSaleTarget) return;
+    const finalNote = reviewObsTextInput.trim();
+    const targetCopy = {
+      ...reviewObsSaleTarget,
+      observation: finalNote,
+      observationStatus: "approved",
+      observationResolvedAt: new Date().toLocaleString("es-SV"),
+    };
+
+    setSales(
+      sales.map((s) => (s.id === reviewObsSaleTarget.id ? targetCopy : s))
+    );
+    setReviewObsSaleTarget(null);
+    setReviewObsTextInput("");
+
+    if (openSaleEditAfter) {
+      openSaleEditorDirectly(targetCopy);
     }
   };
 
@@ -652,32 +819,18 @@ export default function NegocioElCheleApp() {
 
   const handleDeleteSupply = (supObj) => {
     if (!priceAndStockUnlocked) {
-      openPasswordModal("priceAndStock");
+      openPasswordModal("deleteSupply", supObj);
       return;
     }
+    executeDeleteSupply(supObj);
+  };
 
-    const confirmed = window.confirm(
-      `¿Eliminar el insumo "${supObj.name}" del inventario? También se quitará de las recetas de productos.`
-    );
-    if (!confirmed) return;
-
-    const nextSupplies = supplies.filter((s) => s.id !== supObj.id);
-    const nextProducts = products.map((p) => ({
-      ...p,
-      recipe: Array.isArray(p.recipe)
-        ? p.recipe.filter((r) => r.supplyId !== supObj.id)
-        : [],
-    }));
-
-    setSupplies(nextSupplies);
-    setProducts(syncProductsWithSharedSupplies(nextProducts, nextSupplies));
-
-    if (newSelectedSupplyId === supObj.id) {
-      setNewSelectedSupplyId(nextSupplies[0]?.id || "");
+  const handleDeleteProduct = (prodObj) => {
+    if (!priceAndStockUnlocked) {
+      openPasswordModal("deleteProduct", prodObj);
+      return;
     }
-    if (editSelectedSupplyId === supObj.id) {
-      setEditSelectedSupplyId(nextSupplies[0]?.id || "");
-    }
+    executeDeleteProduct(prodObj);
   };
 
   // --- EDITAR PRODUCTO Y SUS INSUMOS VINCULADOS ---
@@ -882,6 +1035,10 @@ export default function NegocioElCheleApp() {
 
   // --- ACTUALIZAR INVENTARIO DE INSUMOS CON HISTORIAL ---
   const openUpdateInventoryModal = () => {
+    if (!priceAndStockUnlocked) {
+      openPasswordModal("priceAndStock");
+      return;
+    }
     const initialMap = {};
     supplies.forEach((s) => {
       initialMap[s.id] = "";
@@ -1029,6 +1186,17 @@ export default function NegocioElCheleApp() {
       ? cashNum - cartTotal
       : 0;
 
+  const generateNextSaleTxId = () => {
+    const existingNums = sales
+      .map((s) => {
+        const match = String(s.saleTxId || "").match(/TRX-(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter((n) => !Number.isNaN(n));
+    const maxNum = existingNums.length > 0 ? Math.max(...existingNums) : sales.length;
+    return `TRX-${String(maxNum + 1).padStart(4, "0")}`;
+  };
+
   const handleCompleteSale = () => {
     if (cart.length === 0) return;
     if (
@@ -1076,6 +1244,7 @@ export default function NegocioElCheleApp() {
 
     const newSale = {
       id: Date.now(),
+      saleTxId: generateNextSaleTxId(),
       date: new Date().toLocaleString("es-SV"),
       items: cart,
       total: cartTotal,
@@ -1083,6 +1252,8 @@ export default function NegocioElCheleApp() {
       transactionCode: cleanTxCode,
       cashGiven: paymentMethod === "Efectivo" ? cashNum : cartTotal,
       change: paymentMethod === "Efectivo" ? Math.max(0, changeAmount) : 0,
+      observation: "",
+      observationStatus: null,
     };
 
     setSales([newSale, ...sales]);
@@ -1147,16 +1318,12 @@ export default function NegocioElCheleApp() {
   const handleAddProduct = (e) => {
     e.preventDefault();
     if (!newProdName.trim()) return;
-    const priceVal = parseFloat(newProdPrice) || 0;
-
-    if (
-      !priceAndStockUnlocked &&
-      (priceVal > 0 || newProdStock !== "" || newProdRecipe.length > 0)
-    ) {
+    if (!priceAndStockUnlocked) {
       openPasswordModal("priceAndStock");
       return;
     }
 
+    const priceVal = parseFloat(newProdPrice) || 0;
     const cleanRecipe = newProdRecipe
       .map((r) => ({ supplyId: r.supplyId, qty: parseFloat(r.qty) || 0 }))
       .filter((r) => r.supplyId && r.qty > 0);
@@ -1359,13 +1526,21 @@ export default function NegocioElCheleApp() {
     XLSX.utils.book_append_sheet(
       wb,
       XLSX.utils.json_to_sheet(
-        sales.map((s) => ({
+        sales.map((s, idx) => ({
+          ID_Transaccion: formatSaleTxId(s, sales.length - idx),
           Fecha: s.date,
           Productos: s.items.map((i) => `${i.qty}x ${i.name}`).join(", "),
           Total: Number(s.total.toFixed(2)),
           Metodo_Pago: s.paymentMethod,
           Codigo_Transaccion: s.transactionCode || "",
           Cambio: Number(s.change.toFixed(2)),
+          Observacion: s.observation || "",
+          Estado_Observacion:
+            s.observationStatus === "pending"
+              ? "Pendiente revisión"
+              : s.observationStatus === "approved"
+              ? "Aprobada"
+              : "",
         }))
       ),
       "Ventas"
@@ -1416,6 +1591,38 @@ export default function NegocioElCheleApp() {
 
   const totalPaymentsMade = paidEmployeePay + paidOtherDebts;
   const totalPendingDebtsAndSalaries = pendingEmployeePay + pendingOtherDebts;
+
+  // Lista consolidada y ordenada de todos los pagos programados pendientes (Salarios + Deudas/Compromisos)
+  const scheduledPendingPayments = [
+    ...financial.employees.flatMap((emp) =>
+      emp.payDates
+        .filter((pd) => !pd.paid && (parseFloat(pd.amount) || 0) > 0)
+        .map((pd) => ({
+          uid: `emp-${emp.id}-${pd.id}`,
+          kind: "Salario",
+          title: `${emp.name} — ${pd.label}`,
+          subtitle: pd.note || `Inicio: ${emp.startDate}`,
+          dueDate: pd.dueDate || "9999-12-31",
+          amount: parseFloat(pd.amount) || 0,
+          onMarkPaid: () => toggleEmployeePayment(emp.id, pd.id),
+        }))
+    ),
+    ...financial.otherDebts
+      .filter((d) => !d.paid && (parseFloat(d.amount) || 0) > 0)
+      .map((d) => ({
+        uid: `debt-${d.id}`,
+        kind: "Deuda / Compromiso",
+        title: d.concept,
+        subtitle: "Pago programado",
+        dueDate: d.date || "9999-12-31",
+        amount: parseFloat(d.amount) || 0,
+        onMarkPaid: () => toggleDebtPaid(d.id),
+      })),
+  ].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+  const pendingObservationsCount = sales.filter(
+    (s) => s.observationStatus === "pending" && s.observation
+  ).length;
 
   const netCashInDrawer =
     totalCashSales - totalReinvestments - totalPaymentsMade;
@@ -1469,7 +1676,13 @@ export default function NegocioElCheleApp() {
                   ? "Desbloquear Eliminación de Ventas"
                   : pendingAction === "editSale"
                   ? "Desbloquear Edición de Ventas"
-                  : "Desbloquear Edición de Menú y Stock"}
+                  : pendingAction === "reviewObservation"
+                  ? "Validar Observación"
+                  : pendingAction === "deleteProduct"
+                  ? "Desbloquear Eliminación de Producto"
+                  : pendingAction === "deleteSupply"
+                  ? "Desbloquear Eliminación de Insumo"
+                  : "Desbloquear Modificación de Inventario"}
               </span>
             </div>
             <p className="text-sm text-slate-600">
@@ -1479,6 +1692,12 @@ export default function NegocioElCheleApp() {
                 ? "Ingresa la contraseña del dueño para eliminar ventas y devolver su stock."
                 : pendingAction === "editSale"
                 ? "Ingresa la contraseña del dueño para modificar ventas registradas."
+                : pendingAction === "reviewObservation"
+                ? "Ingresa la contraseña del dueño para revisar y aprobar esta observación."
+                : pendingAction === "deleteProduct"
+                ? "Ingresa la contraseña del dueño para eliminar productos del menú."
+                : pendingAction === "deleteSupply"
+                ? "Ingresa la contraseña del dueño para eliminar insumos del inventario."
                 : "Ingresa la contraseña del dueño para modificar productos, insumos, precios o stock."}
             </p>
             <input
@@ -1497,11 +1716,7 @@ export default function NegocioElCheleApp() {
             <div className="flex justify-end gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => {
-                  setPendingAction(null);
-                  setSalePendingAction(null);
-                  setProductPendingEdit(null);
-                }}
+                onClick={clearPendingState}
                 className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-medium hover:bg-slate-50"
               >
                 Cancelar
@@ -1511,6 +1726,147 @@ export default function NegocioElCheleApp() {
                 className="px-4 py-2 rounded-xl bg-blue-800 text-white text-sm font-semibold hover:bg-blue-900"
               >
                 Entrar
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL PARA QUE EL VENDEDOR ESCRIBA OBSERVACIÓN EN UNA VENTA */}
+      {obsSaleTarget && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSaveSellerObservation}
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4"
+          >
+            <div className="flex justify-between items-center border-b pb-3">
+              <div className="flex items-center gap-2 text-amber-600">
+                <Lightbulb size={22} />
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Observación de Venta ({obsSaleTarget.saleTxId || "TRX"})
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {obsSaleTarget.date} · Total: $
+                    {Number(obsSaleTarget.total).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setObsSaleTarget(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1.5">
+                Comentario u observación del vendedor
+              </label>
+              <textarea
+                rows={4}
+                autoFocus
+                required
+                placeholder="Ej. El cliente pidió cambio de sabor, se entregó producto extra, error en cobro..."
+                value={obsTextInput}
+                onChange={(e) => setObsTextInput(e.target.value)}
+                className="w-full p-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Esta nota quedará marcada hasta que el dueño la valide o
+                apruebe.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setObsSaleTarget(null)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-medium hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-sm font-bold flex items-center gap-1.5"
+              >
+                <Lightbulb size={16} /> Guardar Observación
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL PARA QUE EL DUEÑO VALIDE, CAMBIE O APRUEBE LA OBSERVACIÓN */}
+      {reviewObsSaleTarget && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <form
+            onSubmit={(e) => handleApproveAndResolveObservation(e, false)}
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4"
+          >
+            <div className="flex justify-between items-center border-b pb-3">
+              <div className="flex items-center gap-2 text-blue-800">
+                <Lightbulb size={22} className="text-amber-500" />
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Validar Observación ({reviewObsSaleTarget.saleTxId || "TRX"})
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {reviewObsSaleTarget.date} · Total: $
+                    {Number(reviewObsSaleTarget.total).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewObsSaleTarget(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-700">
+              <span className="font-bold">Productos de la venta: </span>
+              {reviewObsSaleTarget.items
+                .map((i) => `${i.qty}x ${i.name}`)
+                .join(", ")}
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1.5">
+                Observación registrada (puedes editarla antes de aprobar)
+              </label>
+              <textarea
+                rows={3}
+                value={reviewObsTextInput}
+                onChange={(e) => setReviewObsTextInput(e.target.value)}
+                className="w-full p-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setReviewObsSaleTarget(null)}
+                className="px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-semibold hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={(e) => handleApproveAndResolveObservation(e, true)}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold flex items-center gap-1"
+              >
+                <Pencil size={14} /> Aprobar y Modificar Venta
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold flex items-center gap-1"
+              >
+                <Check size={15} /> Aprobar y Quitar Aviso
               </button>
             </div>
           </form>
@@ -1749,7 +2105,7 @@ export default function NegocioElCheleApp() {
             <div className="flex justify-between items-center border-b pb-3">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">
-                  Modificar Venta
+                  Modificar Venta ({editingSale.saleTxId || "TRX"})
                 </h3>
                 <p className="text-xs text-slate-500">
                   Registrada el {editingSale.date}
@@ -1832,11 +2188,11 @@ export default function NegocioElCheleApp() {
                 editSaleMethod === "Tarjeta") && (
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
-                    Código de transacción
+                    Ref. bancaria / tarjeta
                   </label>
                   <input
                     type="text"
-                    placeholder="Ej. TXN-948271"
+                    placeholder="Ej. REF-948271"
                     value={editSaleTxCode}
                     onChange={(e) => setEditSaleTxCode(e.target.value)}
                     className="w-full p-2.5 border border-slate-300 rounded-xl bg-white text-sm font-semibold"
@@ -2060,6 +2416,11 @@ export default function NegocioElCheleApp() {
               }`}
             >
               <History size={17} /> Historial Ventas ({sales.length})
+              {pendingObservationsCount > 0 && (
+                <span className="ml-1 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-400 text-slate-950">
+                  <Lightbulb size={11} /> {pendingObservationsCount}
+                </span>
+              )}
             </button>
 
             <button
@@ -2172,7 +2533,12 @@ export default function NegocioElCheleApp() {
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between h-fit sticky top-4">
               <div>
                 <div className="flex items-center justify-between border-b pb-3 mb-3">
-                  <h2 className="text-lg font-bold">Orden de Venta</h2>
+                  <div>
+                    <h2 className="text-lg font-bold">Orden de Venta</h2>
+                    <p className="text-[11px] font-semibold text-blue-700">
+                      ID próximo: {generateNextSaleTxId()}
+                    </p>
+                  </div>
                   {cart.length > 0 && (
                     <button
                       onClick={() => setCart([])}
@@ -2297,7 +2663,7 @@ export default function NegocioElCheleApp() {
                   paymentMethod === "Tarjeta") && (
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5">
                     <label className="block text-xs font-bold uppercase text-slate-600">
-                      Código de transacción ({paymentMethod})
+                      Referencia bancaria / tarjeta ({paymentMethod})
                     </label>
                     <input
                       type="text"
@@ -2328,7 +2694,7 @@ export default function NegocioElCheleApp() {
           </div>
         )}
 
-        {/* 2. INVENTARIO DIARIO Y PRECIOS / STOCK INICIAL PROTEGIDOS */}
+        {/* 2. INVENTARIO DIARIO Y MODIFICACIONES PROTEGIDAS */}
         {activeTab === "inventory" && (
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
@@ -2337,8 +2703,8 @@ export default function NegocioElCheleApp() {
                   Inventario Diario y Control de Stock
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Puedes vincular qué insumos ocupa cada producto: al venderlo,
-                  se descontarán esos insumos del inventario.
+                  Cualquier modificación o eliminación en el inventario requiere
+                  contraseña.
                 </p>
               </div>
 
@@ -2348,6 +2714,7 @@ export default function NegocioElCheleApp() {
                   onClick={openUpdateInventoryModal}
                   className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition"
                 >
+                  {!priceAndStockUnlocked && <Lock size={15} />}
                   <ClipboardCheck size={17} /> Actualizar inventario
                 </button>
 
@@ -2370,8 +2737,8 @@ export default function NegocioElCheleApp() {
                     <Lock size={16} />
                   )}
                   {priceAndStockUnlocked
-                    ? "Precio / Stock Desbloqueados"
-                    : "Desbloquear Precio / Stock"}
+                    ? "Modificación Desbloqueada"
+                    : "Desbloquear Modificación"}
                 </button>
 
                 <button
@@ -2499,16 +2866,21 @@ export default function NegocioElCheleApp() {
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        if (!priceAndStockUnlocked) {
+                          openPasswordModal("priceAndStock");
+                          return;
+                        }
                         addSupplyToRecipe(
                           newProdRecipe,
                           setNewProdRecipe,
                           newSelectedSupplyId,
                           newSelectedSupplyQty
-                        )
-                      }
+                        );
+                      }}
                       className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1"
                     >
+                      {!priceAndStockUnlocked && <Lock size={12} />}
                       <Plus size={14} /> Agregar Insumo
                     </button>
                   </div>
@@ -2545,6 +2917,7 @@ export default function NegocioElCheleApp() {
                     type="submit"
                     className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1"
                   >
+                    {!priceAndStockUnlocked && <Lock size={14} />}
                     <Plus size={16} /> Agregar Producto al Menú
                   </button>
                 </div>
@@ -2659,14 +3032,11 @@ export default function NegocioElCheleApp() {
                             </button>
                             <button
                               type="button"
-                              onClick={() =>
-                                setProducts(
-                                  products.filter((p) => p.id !== prod.id)
-                                )
-                              }
-                              className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg"
+                              onClick={() => handleDeleteProduct(prod)}
+                              className="inline-flex items-center gap-1 text-red-600 hover:bg-red-50 px-2 py-1.5 rounded-lg text-xs font-bold"
                             >
-                              <Trash2 size={16} />
+                              {!priceAndStockUnlocked && <Lock size={12} />}
+                              <Trash2 size={15} />
                             </button>
                           </div>
                         </td>
@@ -2685,9 +3055,7 @@ export default function NegocioElCheleApp() {
                     Materiales e Insumos (Empaques y Materia Prima)
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Crea o elimina insumos, ajusta cantidades con{" "}
-                    <strong>Actualizar inventario</strong> o descuéntalos al
-                    vender.
+                    Crear, modificar o eliminar insumos requiere contraseña.
                   </p>
                 </div>
               </div>
@@ -2839,7 +3207,7 @@ export default function NegocioElCheleApp() {
           </div>
         )}
 
-        {/* 3. HISTORIAL DE VENTAS CON MODIFICACIÓN Y ELIMINACIÓN PROTEGIDAS */}
+        {/* 3. HISTORIAL DE VENTAS CON ID TRANSACCIÓN, OBSERVACIONES (FOCO) Y VALIDACIÓN */}
         {activeTab === "history" && (
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
@@ -2848,6 +3216,12 @@ export default function NegocioElCheleApp() {
                 <p className="text-2xl font-extrabold text-green-700 mt-1">
                   Total Vendido: ${totalSold.toFixed(2)}
                 </p>
+                {pendingObservationsCount > 0 && (
+                  <p className="text-xs font-bold text-amber-700 flex items-center gap-1 mt-1">
+                    <Lightbulb size={14} /> Hay {pendingObservationsCount}{" "}
+                    observación(es) pendiente(s) de validación por el dueño.
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap gap-2.5">
                 <button
@@ -2891,72 +3265,162 @@ export default function NegocioElCheleApp() {
                 <table className="w-full text-left border-collapse text-sm">
                   <thead className="bg-slate-50 border-b text-xs uppercase text-slate-500">
                     <tr>
+                      <th className="p-4">ID Transacción</th>
                       <th className="p-4">Fecha y Hora</th>
                       <th className="p-4">Productos</th>
                       <th className="p-4">Pago</th>
                       <th className="p-4">Total</th>
                       <th className="p-4">Cambio</th>
+                      <th className="p-4">Observación</th>
                       <th className="p-4 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {sales.map((sale) => (
-                      <tr key={sale.id} className="hover:bg-slate-50">
-                        <td className="p-4 text-slate-500 whitespace-nowrap">
-                          {sale.date}
-                          {sale.editedAt && (
-                            <span className="block text-[11px] text-amber-700">
-                              Editada: {sale.editedAt}
+                    {sales.map((sale, idx) => {
+                      const txIdLabel = formatSaleTxId(sale, sales.length - idx);
+                      const hasPendingObs =
+                        sale.observationStatus === "pending" && sale.observation;
+
+                      return (
+                        <tr
+                          key={sale.id}
+                          className={
+                            hasPendingObs
+                              ? "bg-amber-50/70 hover:bg-amber-50"
+                              : "hover:bg-slate-50"
+                          }
+                        >
+                          <td className="p-4 whitespace-nowrap">
+                            <span className="font-mono text-xs font-extrabold px-2.5 py-1 rounded-lg bg-slate-800 text-white">
+                              {txIdLabel}
                             </span>
-                          )}
-                        </td>
-                        <td className="p-4 font-medium">
-                          {sale.items
-                            .map((i) => `${i.qty}x ${i.name}`)
-                            .join(", ")}
-                        </td>
-                        <td className="p-4">
-                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                            {sale.paymentMethod}
-                          </span>
-                          {(sale.paymentMethod === "Transferencia" ||
-                            sale.paymentMethod === "Tarjeta") &&
-                            sale.transactionCode && (
-                              <span className="block text-[11px] text-slate-600 font-semibold mt-1">
-                                Cód: {sale.transactionCode}
+                          </td>
+                          <td className="p-4 text-slate-500 whitespace-nowrap">
+                            {sale.date}
+                            {sale.editedAt && (
+                              <span className="block text-[11px] text-amber-700">
+                                Editada: {sale.editedAt}
                               </span>
                             )}
-                        </td>
-                        <td className="p-4 font-extrabold text-slate-900">
-                          ${sale.total.toFixed(2)}
-                        </td>
-                        <td className="p-4 text-slate-600">
-                          {sale.paymentMethod === "Efectivo"
-                            ? `$${sale.change.toFixed(2)}`
-                            : "-"}
-                        </td>
-                        <td className="p-4 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleRequestEditSale(sale)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100"
-                            >
-                              {!salesEditUnlocked && <Lock size={13} />}
-                              <Pencil size={13} /> Modificar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRequestDeleteSale(sale)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-xs font-bold text-red-700 hover:bg-red-100"
-                            >
-                              {!salesEditUnlocked && <Lock size={13} />}
-                              <Trash2 size={13} /> Eliminar
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="p-4 font-medium">
+                            {sale.items
+                              .map((i) => `${i.qty}x ${i.name}`)
+                              .join(", ")}
+                          </td>
+                          <td className="p-4">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                              {sale.paymentMethod}
+                            </span>
+                            {(sale.paymentMethod === "Transferencia" ||
+                              sale.paymentMethod === "Tarjeta") &&
+                              sale.transactionCode && (
+                                <span className="block text-[11px] text-slate-600 font-semibold mt-1">
+                                  Ref: {sale.transactionCode}
+                                </span>
+                              )}
+                          </td>
+                          <td className="p-4 font-extrabold text-slate-900">
+                            ${sale.total.toFixed(2)}
+                          </td>
+                          <td className="p-4 text-slate-600">
+                            {sale.paymentMethod === "Efectivo"
+                              ? `$${sale.change.toFixed(2)}`
+                              : "-"}
+                          </td>
+                          <td className="p-4 max-w-xs">
+                            {hasPendingObs ? (
+                              <div className="bg-amber-100 border border-amber-300 rounded-xl p-2.5 space-y-1.5">
+                                <div className="flex items-start gap-1.5 text-amber-950 text-xs">
+                                  <Lightbulb
+                                    size={15}
+                                    className="text-amber-600 shrink-0 mt-0.5"
+                                  />
+                                  <span className="font-medium">
+                                    {sale.observation}
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleRequestReviewObservation({
+                                        ...sale,
+                                        saleTxId: txIdLabel,
+                                      })
+                                    }
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-green-700 hover:bg-green-800 text-white text-[11px] font-bold"
+                                  >
+                                    {!salesEditUnlocked && <Lock size={11} />}
+                                    <Check size={12} /> Validar / Aprobar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openSellerObservationModal({
+                                        ...sale,
+                                        saleTxId: txIdLabel,
+                                      })
+                                    }
+                                    className="px-2 py-1 rounded-lg bg-white border border-amber-300 text-amber-900 text-[11px] font-semibold hover:bg-amber-50"
+                                  >
+                                    Editar nota
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openSellerObservationModal({
+                                    ...sale,
+                                    saleTxId: txIdLabel,
+                                  })
+                                }
+                                title="Agregar observación"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:border-amber-400 hover:bg-amber-50 text-xs font-semibold text-slate-600 hover:text-amber-800 transition"
+                              >
+                                <Lightbulb
+                                  size={15}
+                                  className="text-amber-500"
+                                />
+                                <span>Observar</span>
+                              </button>
+                            )}
+                          </td>
+                          <td className="p-4 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRequestEditSale({
+                                    ...sale,
+                                    saleTxId: txIdLabel,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                              >
+                                {!salesEditUnlocked && <Lock size={13} />}
+                                <Pencil size={13} /> Modificar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRequestDeleteSale({
+                                    ...sale,
+                                    saleTxId: txIdLabel,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-xs font-bold text-red-700 hover:bg-red-100"
+                              >
+                                {!salesEditUnlocked && <Lock size={13} />}
+                                <Trash2 size={13} /> Eliminar
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
@@ -2973,8 +3437,8 @@ export default function NegocioElCheleApp() {
                 <div>
                   <h2 className="text-lg font-bold">Control Financiero</h2>
                   <p className="text-xs text-slate-500">
-                    Meta general, efectivo neto descontando reinversión, fechas
-                    de Kat y Gab, deudas y pagos
+                    Meta general, pagos programados pendientes, salarios de Kat
+                    y Gab, deudas y reinversión
                   </p>
                 </div>
               </div>
@@ -3146,11 +3610,125 @@ export default function NegocioElCheleApp() {
               </div>
             </div>
 
-            {/* Fechas y Pagos de Kat y Gab */}
+            {/* CALENDARIO DE PAGOS PROGRAMADOS PENDIENTES (SALARIOS + DEUDAS) */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+              <div className="flex flex-wrap justify-between items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Clock className="text-amber-600" size={20} />
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Pagos Programados Pendientes (Salarios y Compromisos)
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Todos los pagos pendientes ordenados por fecha con su
+                      monto a cubrir
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 px-3.5 py-1.5 rounded-xl text-right">
+                  <span className="block text-[11px] font-bold uppercase text-amber-800">
+                    Total Pendiente Programado
+                  </span>
+                  <span className="text-lg font-extrabold text-amber-950">
+                    ${totalPendingDebtsAndSalaries.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {scheduledPendingPayments.length === 0 ? (
+                <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 p-4 rounded-xl font-semibold">
+                  ¡No hay pagos programados pendientes! Todo está al día.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead className="bg-slate-50 border-b text-xs uppercase text-slate-500">
+                      <tr>
+                        <th className="p-3">Fecha Programada</th>
+                        <th className="p-3">Tipo</th>
+                        <th className="p-3">Concepto</th>
+                        <th className="p-3">Monto a Pagar</th>
+                        <th className="p-3">Disponibilidad</th>
+                        <th className="p-3 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {scheduledPendingPayments.map((item) => {
+                        const hasFunds = availableCash >= item.amount;
+                        return (
+                          <tr key={item.uid} className="hover:bg-slate-50">
+                            <td className="p-3 font-bold text-slate-800 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1.5">
+                                <Calendar
+                                  size={14}
+                                  className="text-blue-700"
+                                />
+                                {item.dueDate === "9999-12-31"
+                                  ? "Sin fecha"
+                                  : item.dueDate}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                  item.kind === "Salario"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {item.kind}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <p className="font-semibold text-slate-900">
+                                {item.title}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {item.subtitle}
+                              </p>
+                            </td>
+                            <td className="p-3 font-extrabold text-slate-900">
+                              ${item.amount.toFixed(2)}
+                            </td>
+                            <td className="p-3">
+                              {hasFunds ? (
+                                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                                  ✓ Fondos disponibles
+                                </span>
+                              ) : (
+                                <span className="text-xs font-semibold text-slate-500">
+                                  Pendiente de ingreso
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={item.onMarkPaid}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                                  hasFunds
+                                    ? "bg-green-600 hover:bg-green-700 text-white"
+                                    : "bg-slate-800 hover:bg-slate-900 text-white"
+                                }`}
+                              >
+                                Registrar Pago
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Fechas y Pagos de Salarios — Kat y Gab */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Pagos y Fechas — Kat y Gab
+                  Pago de Salarios — Kat y Gab
                 </h3>
                 <p className="text-xs text-slate-500">
                   Inicio: <strong>Kat el 3 de diciembre</strong> y{" "}
@@ -3293,7 +3871,7 @@ export default function NegocioElCheleApp() {
                   type="submit"
                   className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1"
                 >
-                  <Plus size={16} /> Agregar Fecha
+                  <Plus size={16} /> Programar Salario
                 </button>
               </form>
             </div>
@@ -3301,9 +3879,14 @@ export default function NegocioElCheleApp() {
             {/* Deudas y Reinversiones */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-                <h3 className="font-bold text-slate-900">
-                  Deudas y Compromisos
-                </h3>
+                <div>
+                  <h3 className="font-bold text-slate-900">
+                    Otros Pagos Programados y Deudas
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Registra pagos futuros con su fecha programada y monto
+                  </p>
+                </div>
 
                 <form
                   onSubmit={handleAddDebt}
@@ -3312,13 +3895,14 @@ export default function NegocioElCheleApp() {
                   <input
                     type="text"
                     required
-                    placeholder="Concepto de deuda"
+                    placeholder="Concepto del pago"
                     value={newDebtConcept}
                     onChange={(e) => setNewDebtConcept(e.target.value)}
                     className="flex-1 min-w-[140px] p-2 border rounded-lg bg-white text-sm"
                   />
                   <input
                     type="date"
+                    required
                     value={newDebtDate}
                     onChange={(e) => setNewDebtDate(e.target.value)}
                     className="p-2 border rounded-lg bg-white text-sm"
@@ -3336,7 +3920,7 @@ export default function NegocioElCheleApp() {
                     type="submit"
                     className="bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 rounded-lg text-sm font-semibold"
                   >
-                    Registrar
+                    Programar
                   </button>
                 </form>
 
